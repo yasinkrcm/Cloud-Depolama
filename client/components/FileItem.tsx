@@ -173,12 +173,13 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
                 className="absolute inset-0 bg-cover bg-center opacity-40 blur-xl scale-125"
                 style={{ backgroundImage: `url(${previewUrl})` }}
               />
-              <img
-                src={previewUrl}
-                alt={file.fileName}
-                className="w-full h-full object-contain relative z-10 drop-shadow-lg"
-                onError={() => setPreviewError(true)}
-              />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt={file.fileName}
+                  className="w-full h-full object-contain relative z-10 drop-shadow-lg"
+                  onError={() => setPreviewError(true)}
+                />
             </div>
           ) : isVideo ? (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500/10 to-pink-500/10">

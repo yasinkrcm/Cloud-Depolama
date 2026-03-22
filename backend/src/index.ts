@@ -42,12 +42,19 @@ function isError(obj: unknown): obj is Error {
 }
 
 /**
+ * Allowed CORS origins configuration
+ */
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002']
+
+/**
  * Global error handler setup
  * Logs all errors and returns formatted response
  */
 const app = new Elysia()
   .use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+    origin: ALLOWED_ORIGINS,
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']

@@ -66,7 +66,7 @@ export default function HomePage() {
             </div>
             <h3 className="font-semibold text-white mb-2">Uçtan Uca Şifreli</h3>
             <p className="text-sm text-gray-400 leading-relaxed">
-              Tüm dosyalar SHA-256 hash'leri ile doğrulanır
+              Tüm dosyalar SHA-256 hash&apos;leri ile doğrulanır
             </p>
           </div>
 

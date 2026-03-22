@@ -16,6 +16,8 @@ import mongoose from 'mongoose'
  * Storage directory configuration
  */
 const STORAGE_DIR = process.env.STORAGE_DIR || './storage'
+const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE) || 10737418240
+
 
 /**
  * Ensure storage directory exists
@@ -95,6 +97,15 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
       await ensureStorageDir()
 
       const { fileName, fileSize, mimeType, chunkSize, totalChunks, fileHash } = body
+
+      // Validate max file size
+      if (fileSize > MAX_FILE_SIZE) {
+        set.status = 400
+        return {
+          success: false,
+          error: `fileSize exceeds the maximum limit of ${MAX_FILE_SIZE} bytes`
+        }
+      }
 
       // Validate chunk size
       if (chunkSize < 1024 || chunkSize > 100 * 1024 * 1024) {

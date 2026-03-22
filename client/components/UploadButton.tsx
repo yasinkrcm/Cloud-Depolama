@@ -26,15 +26,23 @@ export function UploadButton() {
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
+    const MAX_FILE_SIZE = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 10737418240;
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      
+      if (file && file.size > MAX_FILE_SIZE) {
+        alert(`Dosya boyutu ${(MAX_FILE_SIZE / (1024 * 1024 * 1024)).toFixed(1)}GB limitini aşıyor: ${file.name}`)
+        continue
+      }
+      
       if (file && file.size > 0) {
         await uploadFile(file, undefined, () => {
           void queryClient.invalidateQueries({ queryKey: ['files'] })
         })
       }
     }
-  }, [uploadFile])
+  }, [uploadFile, queryClient])
 
   /**
    * Handle drag events
@@ -52,16 +60,14 @@ export function UploadButton() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    handleFiles(e.dataTransfer.files)
+    void handleFiles(e.dataTransfer.files)
   }, [handleFiles])
 
   /**
    * Handle file input change
    */
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    handleFiles(e.target.files)
+    void handleFiles(e.target.files)
     // Reset input
     e.target.value = ''
   }, [handleFiles])

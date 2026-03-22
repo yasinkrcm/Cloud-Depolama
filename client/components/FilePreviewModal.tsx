@@ -95,6 +95,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
         <div className="flex-1 overflow-auto bg-black/50 relative min-h-0 flex items-center justify-center p-2 sm:p-6 md:p-8">
           {isImage ? (
             <div className={`w-full h-full flex ${isZoomed ? 'items-start justify-start' : 'items-center justify-center'} overflow-auto`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewUrl}
                 alt={file.fileName}
@@ -102,8 +103,8 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
                   e.stopPropagation()
                   setIsZoomed(!isZoomed)
                 }}
-                className={isZoomed 
-                  ? "w-auto h-auto max-w-none origin-top-left cursor-zoom-out select-none scale-[1.3] transition-transform duration-300" 
+                className={isZoomed
+                  ? "w-auto h-auto max-w-none origin-top-left cursor-zoom-out select-none scale-[1.3] transition-transform duration-300"
                   : "max-w-full max-h-full min-h-[200px] object-contain cursor-zoom-in drop-shadow-2xl select-none transition-transform duration-300 rounded-lg"
                 }
                 draggable={false}
