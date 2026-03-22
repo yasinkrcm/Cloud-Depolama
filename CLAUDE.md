@@ -14,6 +14,8 @@ Cloud Storage uygulaması inşa etmek.
 
 ## MEMORY & KNOWLEDGE MANAGEMENT
 
+⚠️ **KRİTİK KURAL** — Her hata çözüldüğünde .yasin/fixed/ 'e kayıt ZORUNLU
+
 GÖREV BAŞLAMADAN şunu çalıştır:
 ```bash
 find .agent/rules/ .yasin/fixed/ -name "*.md" 2>/dev/null | head -40
@@ -22,10 +24,30 @@ Bu dosyalar daha önce çözülmüş hataların ve mimari kararların
 arşividir. Aynı hatayı iki kez yapma.
 
 Kayıt kuralları:
-- Yeni mimari karar → .agent/rules/spec.md güncelle
-- Hata çözüldü     → .yasin/fixed/YYYY-MM-DD-{slug}.md
+- Hata çözüldü     → .yasin/fixed/YYYY-MM-DD-{slug}.md ⚠️ **ZORUNLU - HER HATA**
   Format: ## Hata | ## Root Cause | ## Çözüm | ## Test
+- Yeni mimari karar → .agent/rules/spec.md güncelle
 - Breaking change  → .agent/rules/BREAKING.md başına ekle
+
+**Örnek kayıt formatı:**
+```markdown
+# Hata Başlığı
+
+**Tarih:** YYYY-MM-DD
+**Dosyalar:** path/to/file.ts
+
+## Hata
+Hata açıklaması ve console output
+
+## Root Cause
+Neden olduğu
+
+## Çözüm
+ nasıl düzeltildi
+
+## Test
+Nasıl doğrulandı
+```
 
 ## ARCHITECTURE CONSTITUTION
 
@@ -110,14 +132,83 @@ TASK 0: Anayasa ve iskelet
 ## TASK ROADMAP (Sıra)
 
 # Her task onaylandıktan sonra bir sonrakine geç:
-TASK 1: Monorepo iskelet + CI/CD config
-TASK 2: MongoDB bağlantısı + File metadata schema
-TASK 3: Chunked upload endpoint (backend) + SHA-256 doğrulama
-TASK 4: Eden Treaty client setup + upload hook (client)
-TASK 5: Upload UI — drag-drop, progress, pause/resume
-TASK 6: File listing, download (stream), silme endpoint'leri
-TASK 7: Error boundary, global error handler, retry logic
+TASK 1: Monorepo iskelet + CI/CD config ✅
+TASK 2: MongoDB bağlantısı + File metadata schema ✅
+TASK 3: Chunked upload endpoint + SHA-256 doğrulama ✅
+TASK 4: Eden Treaty client setup + upload hook ✅
+TASK 5: Upload UI — drag-drop, progress, pause/resume ✅
+TASK 6: File listing, download (stream), silme endpoint'leri ✅
+TASK 7: Error boundary, global error handler, retry logic ✅
 TASK 8: E2E test (Playwright) + load test (autocannon)
+TASK 9: File Management UI — List, Download, Delete ← ŞURADA
+
+## TASK PROGRESS
+
+### ✅ TASK 1: Monorepo iskelet + CI/CD config (TAMAMLANDI)
+- ESLint flat config kuruldu (strict rules)
+- GitHub Actions CI pipeline (.github/workflows/ci.yml)
+- Test infrastructure (backend/test/, client/test/)
+- Pre-commit hooks (lint-staged)
+- Quality gates: lint ✅, typecheck ✅, test ✅
+
+### ✅ TASK 2: MongoDB bağlantısı + File metadata schema (TAMAMLANDI)
+- backend/src/config/database.ts → MongoDB connection + error handling
+- backend/src/models/File.ts → Mongoose schema (SHA-256, chunks, status)
+
+### ✅ TASK 3: Chunked upload endpoint + SHA-256 doğrulama (TAMAMLANDI)
+- backend/src/routes/upload.ts → /upload/init, /upload/chunk, /upload/complete
+- Chunk-by-chunk stream write (buffer yok)
+- SHA-256 verification her chunk'ta
+
+### ✅ TASK 4: Eden Treaty client + upload hook (TAMAMLANDI)
+- client/lib/api.ts → Type-safe API client (Eden Treaty)
+- client/hooks/useUpload.ts → Upload hook + progress tracking
+- client/lib/store/uploadStore.ts → Zustand state management
+- packages/types/src/index.ts → Shared TypeScript interfaces
+
+### ✅ TASK 5: Upload UI (TAMAMLANDI)
+- client/components/UploadButton.tsx → Drag-drop button
+- client/components/UploadList.tsx → Progress bars, status indicators, pause/resume, retry
+- Zustand selector fix (useShallow)
+- FormData chunk upload fix
+
+### ✅ TASK 6: File listing, download, delete (TAMAMLANDI)
+- ✅ GET /files endpoint (backend/src/index.ts)
+- ✅ CORS middleware (@elysiajs/cors)
+- GET /files/:id/download (stream) → TASK 9'a ertelendi
+- DELETE /files/:id → TASK 9'a ertelendi
+
+### ✅ TASK 7: Error boundary, retry logic (TAMAMLANDI)
+- client/app/error.tsx → Page error boundary
+- client/app/global-error.tsx → Root error boundary
+- client/app/loading.tsx → Loading state
+- client/lib/error-handler.ts → Error reporting & retry utilities
+- client/hooks/useUpload.ts → Chunk upload with retry logic
+
+### ❌ TASK 8: E2E test + load test (BAŞLANMADI)
+
+### ✅ TASK 9: File Management UI — List, Download, Delete (TAMAMLANDI)
+
+**Backend Endpoint'leri:**
+- ✅ GET /files/:id/download → Dosyayı stream olarak indirme
+- ✅ DELETE /files/:id → Dosyayı silme (disk + DB)
+- ✅ GET /files → Tüm dosyaları listeleme
+
+**Client Component'leri:**
+- ✅ client/components/FileList.tsx → Dosya listesi (arama, sıralama)
+- ✅ client/components/FileItem.tsx → Tek dosya kartı (ikon, hash, işlemler)
+- ✅ client/hooks/useFiles.ts → Dosya listesi fetch hook
+- ✅ client/app/files/page.tsx → Ayrı dosyalar sayfası
+- ✅ client/app/providers.tsx → QueryClientProvider wrapper
+
+**Özellikler:**
+- ✅ Dosya adı, boyut, yükleme tarihi gösterimi
+- ✅ SHA-256 hash display (kopyalama butonu ile)
+- ✅ Download butonu (stream)
+- ✅ Delete butonu (confirm dialog ile)
+- ✅ Arama/filtreleme (dosya adına göre)
+- ✅ Sıralama (tarih, boyut, isim)
+- ✅ Dosya tipi ikonları (resim, video, ses, PDF, varsayılan)
 
 ## QUALITY GATES
 

@@ -23,7 +23,29 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.strict,
   {
+    files: ['**/test/**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parserOptions: {
+        project: null,
+        tsconfigRootDir: import.meta.dirname
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_'
+        }
+      ],
+      '@typescript-eslint/no-explicit-any': 'error'
+    }
+  },
+  {
     files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['**/test/**'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

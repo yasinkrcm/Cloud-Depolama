@@ -1,16 +1,18 @@
 /**
  * @file layout.tsx
  * @role Root layout for Next.js App Router
- * @depends Next.js App Router
- * @dataflow Server component wrapper → renders children
+ * @depends Next.js App Router, Providers component
+ * @dataflow Server component wrapper → renders children with providers
  */
 
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from './providers'
+import { AuthGuard } from '@/components/AuthGuard'
 
 export const metadata: Metadata = {
-  title: 'Cloud Storage',
-  description: 'High-performance cloud file storage system',
+  title: 'Bulut Depolama',
+  description: 'Yüksek performanslı bulut dosya depolama sistemi',
 }
 
 export default function RootLayout({
@@ -20,7 +22,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>
+          <AuthGuard>
+            {children}
+          </AuthGuard>
+        </Providers>
+      </body>
     </html>
   )
 }

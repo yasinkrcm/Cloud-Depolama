@@ -7,13 +7,16 @@
 
 import mongoose from 'mongoose'
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/cloud-storage'
+const MONGODB_URI = process.env.MONGODB_URI
 
 /**
  * Connect to MongoDB
  */
 export async function connectDatabase() {
   try {
+    if (!MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not defined')
+    }
     await mongoose.connect(MONGODB_URI)
     console.log('✅ MongoDB connected successfully')
   } catch (error) {

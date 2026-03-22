@@ -27,6 +27,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@cloud-storage/types": [
+        "../packages/types/src"
       ]
     },
     "target": "ES2017"
