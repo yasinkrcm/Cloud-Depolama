@@ -5,9 +5,8 @@
  * @dataflow HTTP Request → Elysia routes → Handlers → Response
  */
 
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 import { edenTreaty } from '@elysiajs/eden'
-import mongoose from 'mongoose'
 
 /**
  * Health check endpoint

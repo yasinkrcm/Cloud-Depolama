@@ -2,6 +2,7 @@
   "name": "cloud-storage-monorepo",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "workspaces": [
     "backend",
     "client",
@@ -14,20 +15,26 @@
     "typecheck": "bun run typecheck:backend && bun run typecheck:client",
     "typecheck:backend": "bun --cwd backend run typecheck",
     "typecheck:client": "bun --cwd client run typecheck",
-    "lint": "bun run lint:backend && bun run lint:client",
-    "lint:backend": "bun --cwd backend run lint",
-    "lint:client": "bun --cwd client run lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "bun run test:backend && bun run test:client",
+    "test:backend": "bun --cwd backend test",
+    "test:client": "bun --cwd client test",
     "prepare": "husky"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "concurrently": "^9.0.0",
+    "eslint": "^10.1.0",
+    "eslint-config-next": "^16.2.1",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0"
+    "lint-staged": "^15.0.0",
+    "typescript-eslint": "^8.57.1"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",
-      "tsc --noEmit"
+      "bun run tsc --noEmit"
     ]
   }
 }
