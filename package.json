@@ -32,9 +32,16 @@
     "typescript-eslint": "^8.57.1"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
+    "backend/**/*.{ts,tsx}": [
       "eslint --fix",
-      "bun run tsc --noEmit"
+      "bun --cwd backend run typecheck"
+    ],
+    "client/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "bun --cwd client run typecheck"
+    ],
+    "packages/types/**/*.{ts,tsx}": [
+      "eslint --fix"
     ]
   }
 }

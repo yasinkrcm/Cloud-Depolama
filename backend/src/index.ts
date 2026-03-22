@@ -36,3 +36,4 @@ app.listen(PORT, () => {
  */
 export type App = typeof app
 export const api = edenTreaty<App>('http://localhost:3001')
+
