@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills find:*)",
+      "Bash(bun init -y)",
+      "Bash(bun add:*)",
+      "Bash(bun run typecheck)",
+      "Bash(bunx create-next-app:*)",
+      "Bash(bun *)",
+      "Bash(printf:*)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(yarn *)",
+      "Read(*)",
+      "Search(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Bash(*)",
+      "Bash(git init:*)"
+    ]
+  },
+  "model": "opus",
+  "askBeforeRunningTool": false
+}
