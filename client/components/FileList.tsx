@@ -121,20 +121,20 @@ export function FileList() {
   return (
     <div className="space-y-6">
       {/* Header with back button */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <Link
           href="/"
           className="p-2 -ml-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold text-white tracking-tight">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight truncate">
             Dosyalarım
           </h1>
-          {files && <p className="text-sm text-gray-400 mt-0.5">{categoryCounts.all} dosya güvenli bir şekilde depolanıyor</p>}
+          {files && <p className="text-xs sm:text-sm text-gray-400 mt-0.5">{categoryCounts.all} dosya güvenli bir şekilde depolanıyor</p>}
         </div>
 
         <CreateNoteButton />
@@ -142,17 +142,17 @@ export function FileList() {
         <button
           type="button"
           onClick={() => refetch()}
-          className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+          className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
           title="Yenile"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>
       </div>
 
       {/* Category Filter (Apple-style tabs) */}
-      <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex flex-wrap gap-1.5 sm:gap-2 pb-2">
         <CategoryButton
           label="Tümü"
           count={categoryCounts.all || 0}
@@ -198,11 +198,11 @@ export function FileList() {
       </div>
 
       {/* Search and sort bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         {/* Search input */}
         <div className="relative flex-1">
           <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -214,23 +214,12 @@ export function FileList() {
             placeholder="Dosya ara..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white/10 transition-colors outline-none text-sm"
+            className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 bg-white/5 border border-white/10 text-white placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white/10 transition-colors outline-none text-sm"
           />
         </div>
 
-        {/* Sort dropdown */}
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="px-4 py-2.5 bg-white/5 border border-white/10 text-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white/10 transition-colors outline-none text-sm appearance-none cursor-pointer"
-        >
-          <option value="date-desc">En Yeniler</option>
-          <option value="date-asc">En Eskiler</option>
-          <option value="name-asc">İsim (A-Z)</option>
-          <option value="name-desc">İsim (Z-A)</option>
-          <option value="size-desc">En Büyük Boyut</option>
-          <option value="size-asc">En Küçük Boyut</option>
-        </select>
+        {/* Custom Sort dropdown */}
+        <SortDropdown value={sortBy} onChange={setSortBy} />
       </div>
 
       {/* Loading state */}
@@ -268,7 +257,7 @@ export function FileList() {
 
       {/* File grid (Apple-style masonry layout) */}
       {!isLoading && !error && filteredAndSortedFiles.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredAndSortedFiles.map((file) => (
             <FileItemComponent
               key={file.id}
@@ -301,14 +290,89 @@ function CategoryButton({
       type="button"
       onClick={onClick}
       className={`
-        px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 whitespace-nowrap border
+        px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap border
         ${active
           ? 'bg-primary/20 text-blue-400 border-primary/30 shadow-neon'
           : 'bg-white/5 text-gray-400 border-transparent hover:bg-white/10 hover:text-gray-200'
         }
       `}
     >
-      {label} <span className={active ? 'text-primary/80' : 'text-gray-600 ml-1'}>({count})</span>
+      {label} <span className={active ? 'text-primary/80' : 'text-gray-600 ml-0.5'}>({count})</span>
     </button>
+  )
+}
+
+/**
+ * Sort options for dropdown
+ */
+const sortOptions: { value: SortOption; label: string }[] = [
+  { value: 'date-desc', label: 'En Yeniler' },
+  { value: 'date-asc', label: 'En Eskiler' },
+  { value: 'name-asc', label: 'İsim (A-Z)' },
+  { value: 'name-desc', label: 'İsim (Z-A)' },
+  { value: 'size-desc', label: 'En Büyük Boyut' },
+  { value: 'size-asc', label: 'En Küçük Boyut' },
+]
+
+/**
+ * Custom sort dropdown component
+ */
+function SortDropdown({ value, onChange }: { value: SortOption; onChange: (value: SortOption) => void }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectedLabel = sortOptions.find(opt => opt.value === value)?.label || 'Sırala'
+
+  return (
+    <div className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white border border-gray-200 text-gray-900 rounded-xl hover:bg-gray-50 focus:ring-2 focus:ring-primary focus:bg-white/10 transition-colors outline-none text-[10px] sm:text-xs cursor-pointer min-w-[100px] sm:min-w-[140px] justify-between shadow-sm"
+      >
+        <span className="font-medium truncate">{selectedLabel}</span>
+        <svg
+          className={`w-3 h-3 sm:w-4 sm:h-4 text-gray-600 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown menu */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setIsOpen(false)}
+          />
+
+          {/* Menu */}
+          <div className="absolute right-0 top-full mt-2 z-20 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[140px] sm:min-w-[180px]">
+            {sortOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value)
+                  setIsOpen(false)
+                }}
+                className={`
+                  w-full text-left px-3 sm:px-4 py-2 text-[10px] sm:text-xs font-medium transition-colors
+                  ${value === option.value
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
+                  }
+                `}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

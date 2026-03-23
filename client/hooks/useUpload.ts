@@ -53,17 +53,33 @@ function splitFileIntoChunks(file: File, chunkSize: number): Blob[] {
 
 /**
  * Upload a single chunk with retry logic
+ * @param formData - FormData containing chunk data
+ * @param maxRetries - Maximum number of retry attempts
+ * @param signal - AbortSignal for cancelling/pausing the upload
  */
 async function uploadChunkWithRetry(
   formData: FormData,
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  signal?: AbortSignal
 ): Promise<Response> {
   return withRetry(
     async () => {
-      const response = await fetch(`${API_BASE_URL}/upload/chunk`, {
+      // Check abort before each retry attempt
+      if (signal?.aborted) {
+        throw new Error('Upload paused')
+      }
+
+      const fetchOptions: RequestInit = {
         method: 'POST',
         body: formData
-      })
+      }
+
+      // Only add signal if it's defined (strict TypeScript compatibility)
+      if (signal) {
+        fetchOptions.signal = signal
+      }
+
+      const response = await fetch(`${API_BASE_URL}/upload/chunk`, fetchOptions)
 
       if (!response.ok) {
         throw new Error(`Chunk upload failed: ${response.statusText}`)
@@ -167,8 +183,10 @@ export function useUpload(): UseUploadReturn {
       const chunks = splitFileIntoChunks(file, chunkSize)
 
       for (let i = 0; i < chunks.length; i++) {
-        if (abortController.signal.aborted) {
-          throw new Error('Upload cancelled')
+        // Check both abort signal AND paused state
+        const currentUpload = getUpload(uploadId)
+        if (abortController.signal.aborted || currentUpload?.status === 'paused') {
+          throw new Error('Upload cancelled or paused')
         }
 
         const chunk = chunks[i]
@@ -185,11 +203,12 @@ export function useUpload(): UseUploadReturn {
         formData.append('chunkIndex', String(i))
         formData.append('chunkHash', chunkHash)
 
-        const chunkResponse = await uploadChunkWithRetry(formData)
+        const chunkResponse = await uploadChunkWithRetry(formData, 3, abortController.signal)
 
-        // Check for abort after retry attempt
-        if (abortController.signal.aborted) {
-          throw new Error('Upload cancelled')
+        // Check again after chunk upload
+        const currentUploadAfterChunk = getUpload(uploadId)
+        if (abortController.signal.aborted || currentUploadAfterChunk?.status === 'paused') {
+          throw new Error('Upload cancelled or paused')
         }
 
         if (!chunkResponse.ok) {
@@ -237,11 +256,22 @@ export function useUpload(): UseUploadReturn {
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      reportError(error, ErrorSeverity.HIGH, { fileName: file.name, fileSize: file.size })
-      updateUpload(uploadId, {
-        status: 'failed',
-        error: errorMessage
-      })
+
+      // Don't report user-initiated actions (pause/cancel) as errors
+      const isUserAction = errorMessage.includes('cancelled') || errorMessage.includes('paused')
+
+      if (!isUserAction) {
+        reportError(error, ErrorSeverity.HIGH, { fileName: file.name, fileSize: file.size })
+      }
+
+      // Only update status to failed if it's not a user action
+      // For pause/cancel, the status is already set by those functions
+      if (!isUserAction) {
+        updateUpload(uploadId, {
+          status: 'failed',
+          error: errorMessage
+        })
+      }
     } finally {
       abortControllersRef.current.delete(uploadId)
     }
@@ -340,8 +370,10 @@ export function useUpload(): UseUploadReturn {
       for (let i = 0; i < chunks.length; i++) {
         if (uploadedChunks.includes(i)) continue // Skip already uploaded
 
-        if (abortController.signal.aborted) {
-          throw new Error('Upload cancelled')
+        // Check both abort signal AND paused state
+        const currentUpload = getUpload(id)
+        if (abortController.signal.aborted || currentUpload?.status === 'paused') {
+          throw new Error('Upload cancelled or paused')
         }
 
         const chunk = chunks[i]
@@ -358,11 +390,12 @@ export function useUpload(): UseUploadReturn {
         formData.append('chunkIndex', String(i))
         formData.append('chunkHash', chunkHash)
 
-        const chunkResponse = await uploadChunkWithRetry(formData)
+        const chunkResponse = await uploadChunkWithRetry(formData, 3, abortController.signal)
 
-        // Check for abort after retry attempt
-        if (abortController.signal.aborted) {
-          throw new Error('Upload cancelled')
+        // Check again after chunk upload
+        const currentUploadAfterChunk = getUpload(id)
+        if (abortController.signal.aborted || currentUploadAfterChunk?.status === 'paused') {
+          throw new Error('Upload cancelled or paused')
         }
 
         const chunkResult = await chunkResponse.json() as {
@@ -404,11 +437,21 @@ export function useUpload(): UseUploadReturn {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       const upload = getUpload(id)
-      reportError(error, ErrorSeverity.HIGH, { fileName: upload?.fileName, action: 'resume' })
-      updateUpload(id, {
-        status: 'failed',
-        error: errorMessage
-      })
+
+      // Don't report user-initiated actions (pause/cancel) as errors
+      const isUserAction = errorMessage.includes('cancelled') || errorMessage.includes('paused')
+
+      if (!isUserAction) {
+        reportError(error, ErrorSeverity.HIGH, { fileName: upload?.fileName, action: 'resume' })
+      }
+
+      // Only update status to failed if it's not a user action
+      if (!isUserAction) {
+        updateUpload(id, {
+          status: 'failed',
+          error: errorMessage
+        })
+      }
     } finally {
       abortControllersRef.current.delete(id)
     }
