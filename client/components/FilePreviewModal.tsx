@@ -19,8 +19,41 @@ function FileIconBig({ mimeType, className }: { mimeType?: string; className?: s
 }
 
 export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
-  const [isZoomed, setIsZoomed] = useState(false)
+  // Zoom levels: 1.0 (fit), 1.5x, 2x, 3x, 4x, 5x
+  const zoomLevels: readonly number[] = [1, 1.5, 2, 3, 4, 5] as const
+  const [zoomIndex, setZoomIndex] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [textContent, setTextContent] = useState<string | null>(null)
+  const [textError, setTextError] = useState<string | null>(null)
+
+  const zoom = zoomLevels[zoomIndex] ?? 1
+  const isZoomed = zoom > 1
+  const canZoomIn = zoomIndex < zoomLevels.length - 1
+  const canZoomOut = zoomIndex > 0
+
+  // Fetch text content for text files
+  useEffect(() => {
+    if (!file || file.mimeType !== 'text/plain') {
+      setTextContent(null)
+      setTextError(null)
+      return
+    }
+
+    const fetchTextContent = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/files/${file.id}/download?inline=true`)
+        if (!response.ok) throw new Error('Failed to fetch')
+        const text = await response.text()
+        setTextContent(text)
+        setTextError(null)
+      } catch (err) {
+        setTextError(err instanceof Error ? err.message : 'Failed to load text')
+        setTextContent(null)
+      }
+    }
+
+    fetchTextContent()
+  }, [file])
 
   // Prevent back body scrolling
   useEffect(() => {
@@ -39,7 +72,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
 
   const previewUrl = `${API_BASE_URL}/files/${file.id}/download?inline=true`
   const downloadUrl = `${API_BASE_URL}/files/${file.id}/download`
-  
+
   const isImage = file.mimeType?.startsWith('image/')
   const isVideo = file.mimeType?.startsWith('video/')
   const isAudio = file.mimeType?.startsWith('audio/')
@@ -66,6 +99,37 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
           </div>
           
           <div className="flex items-center gap-2 shrink-0">
+            {/* Zoom controls (only for images) */}
+            {isImage && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setZoomIndex(Math.max(0, zoomIndex - 1))}
+                  disabled={!canZoomOut}
+                  className="p-2 text-gray-400 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:text-white rounded-xl transition-all border border-white/10 flex items-center justify-center min-w-[40px] min-h-[40px]"
+                  title="Küçült (-)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                  </svg>
+                </button>
+                <span className="text-sm font-medium text-gray-300 min-w-[50px] text-center">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setZoomIndex(Math.min(zoomLevels.length - 1, zoomIndex + 1))}
+                  disabled={!canZoomIn}
+                  className="p-2 text-gray-400 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:text-white rounded-xl transition-all border border-white/10 flex items-center justify-center min-w-[40px] min-h-[40px]"
+                  title="Büyüt (+)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+                <hr className="w-px h-6 bg-white/10 mx-1 border-none" />
+              </>
+            )}
             <a
               href={downloadUrl}
               download={file.fileName}
@@ -101,12 +165,19 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
                 alt={file.fileName}
                 onClick={(e) => {
                   e.stopPropagation()
-                  setIsZoomed(!isZoomed)
+                  // Toggle between fit and last zoom level
+                  if (zoom === 1) {
+                    setZoomIndex(1) // Zoom to 1.5x on click
+                  } else {
+                    setZoomIndex(0) // Reset to fit
+                  }
                 }}
-                className={isZoomed
-                  ? "w-auto h-auto max-w-none origin-top-left cursor-zoom-out select-none scale-[1.3] transition-transform duration-300"
-                  : "max-w-full max-h-full min-h-[200px] object-contain cursor-zoom-in drop-shadow-2xl select-none transition-transform duration-300 rounded-lg"
-                }
+                className={`w-auto h-auto max-w-none origin-top-left select-none transition-transform duration-200 ${
+                  isZoomed
+                    ? `cursor-zoom-out scale-[${zoom}] drop-shadow-2xl`
+                    : 'max-w-full max-h-full min-h-[200px] object-contain cursor-zoom-in drop-shadow-xl rounded-lg'
+                }`}
+                style={isZoomed ? { transform: `scale(${zoom})` } : undefined}
                 draggable={false}
               />
             </div>
@@ -126,11 +197,37 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
               title={file.fileName}
             />
           ) : isText ? (
-            <iframe
-              src={previewUrl}
-              className="w-full h-[75vh] max-w-4xl bg-white text-black rounded-xl p-4 shadow-2xl mx-auto block"
-              title={file.fileName}
-            />
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <div className="w-full max-w-5xl h-[70vh] bg-white text-gray-900 rounded-xl shadow-2xl overflow-hidden flex flex-col">
+                {/* Text content header */}
+                <div className="px-4 py-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between shrink-0">
+                  <span className="text-sm font-medium text-gray-600">{file.fileName}</span>
+                  <span className="text-xs text-gray-400">
+                    {textContent ? `${textContent.length} karakter` : 'Yükleniyor...'}
+                  </span>
+                </div>
+                {/* Text content body */}
+                <div className="flex-1 overflow-auto p-4">
+                  {textError ? (
+                    <div className="flex items-center justify-center h-full text-red-500">
+                      <span>{textError}</span>
+                    </div>
+                  ) : textContent === null ? (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full" />
+                    </div>
+                  ) : textContent.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      <span>Boş dosya</span>
+                    </div>
+                  ) : (
+                    <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed">
+                      {textContent}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : isAudio ? (
             <div className="flex flex-col items-center justify-center w-[90%] max-w-md p-8 bg-gray-900 border border-white/10 rounded-3xl shadow-2xl">
               <FileIconBig mimeType={file.mimeType} className="w-20 h-20 text-teal-400 mb-6 drop-shadow-lg" />

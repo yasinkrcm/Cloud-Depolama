@@ -100,8 +100,7 @@ const fileSchema = new Schema<IFileDocument>(
     },
     sha256: {
       type: String,
-      required: true,
-      unique: true
+      required: true
     },
     chunkSize: {
       type: Number,

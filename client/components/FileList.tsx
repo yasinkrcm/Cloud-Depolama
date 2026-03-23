@@ -7,11 +7,13 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useFiles } from '@/hooks/useFiles'
 import { FileItemComponent } from './FileItem'
 import { CreateNoteButton } from './CreateNoteButton'
+import { BulkDeleteModal } from './BulkDeleteModal'
+import { API_BASE_URL } from '@/lib/api'
 
 /**
  * File categories
@@ -31,6 +33,12 @@ export function FileList() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('date-desc')
   const [category, setCategory] = useState<FileCategory>('all')
+
+  // Selection state
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   /**
    * Filter and sort files
@@ -117,6 +125,67 @@ export function FileList() {
       ).length
     }
   }, [files])
+
+  /**
+   * Toggle selection for a single file
+   */
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  /**
+   * Toggle select all / deselect all
+   */
+  const toggleSelectAll = useCallback(() => {
+    const visibleFileIds = new Set(filteredAndSortedFiles.map(f => f.id))
+    if (selectedIds.size === visibleFileIds.size) {
+      // Deselect all
+      setSelectedIds(new Set())
+    } else {
+      // Select all visible
+      setSelectedIds(visibleFileIds)
+    }
+  }, [filteredAndSortedFiles, selectedIds.size])
+
+  /**
+   * Exit select mode
+   */
+  const exitSelectMode = useCallback(() => {
+    setIsSelectMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
+  /**
+   * Handle bulk delete
+   */
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return
+
+    setIsDeleting(true)
+    try {
+      // Delete all selected files
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          fetch(`${API_BASE_URL}/files/${id}`, { method: 'DELETE' })
+        )
+      )
+      setBulkDeleteModalOpen(false)
+      exitSelectMode()
+      refetch()
+    } catch {
+      // Error handling - modal stays open
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [selectedIds, refetch, exitSelectMode])
 
   return (
     <div className="space-y-6">
@@ -220,7 +289,71 @@ export function FileList() {
 
         {/* Custom Sort dropdown */}
         <SortDropdown value={sortBy} onChange={setSortBy} />
+
+        {/* Select mode toggle button */}
+        {!isSelectMode ? (
+          <button
+            type="button"
+            onClick={() => setIsSelectMode(true)}
+            className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-xl transition-colors flex items-center gap-2"
+            title="Çoklu Seçim"
+          >
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            <span className="text-xs sm:text-sm font-medium">Seç</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={exitSelectMode}
+            className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-xl transition-colors flex items-center gap-2"
+            title="İptal"
+          >
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span className="text-xs sm:text-sm font-medium">İptal</span>
+          </button>
+        )}
       </div>
+
+      {/* Bulk Action Bar (visible when in select mode) */}
+      {isSelectMode && (
+        <div className="sticky top-0 z-30 glass-panel rounded-2xl p-4 flex items-center justify-between gap-3 shadow-lg animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="px-3 py-1.5 text-xs sm:text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded-lg transition-colors"
+            >
+              {selectedIds.size === filteredAndSortedFiles.length ? 'Tümünü İptal' : 'Tümünü Seç'}
+            </button>
+            <span className="text-sm text-gray-400">
+              {selectedIds.size > 0 ? (
+                <>
+                  <span className="text-blue-400 font-semibold">{selectedIds.size}</span> dosya seçildi
+                </>
+              ) : (
+                'Dosya seçin'
+              )}
+            </span>
+          </div>
+
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setBulkDeleteModalOpen(true)}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.3)]"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 011-1h-4a1 1 0 01-1-1V3a1 1 0 011-1h6a1 1 0 011 1v3" />
+              </svg>
+              <span className="text-sm">Sil</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Loading state */}
       {isLoading && (
@@ -263,10 +396,22 @@ export function FileList() {
               key={file.id}
               file={file}
               onDelete={() => refetch()}
+              isSelectMode={isSelectMode}
+              isSelected={selectedIds.has(file.id)}
+              onToggleSelect={() => toggleSelect(file.id)}
             />
           ))}
         </div>
       )}
+
+      {/* Bulk Delete Modal */}
+      <BulkDeleteModal
+        count={selectedIds.size}
+        isOpen={bulkDeleteModalOpen}
+        isDeleting={isDeleting}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleteModalOpen(false)}
+      />
     </div>
   )
 }

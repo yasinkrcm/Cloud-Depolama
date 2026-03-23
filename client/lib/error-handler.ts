@@ -29,12 +29,51 @@ interface ErrorReport {
 }
 
 /**
+ * Safely stringify an error object
+ */
+function safeStringify(error: unknown): string {
+  if (error === null || error === undefined) {
+    return 'null or undefined error'
+  }
+
+  if (typeof error === 'string') {
+    return error
+  }
+
+  if (error instanceof Error) {
+    return error.message || error.name || 'Unknown Error'
+  }
+
+  if (typeof error === 'object') {
+    try {
+      // Check for message property
+      if ('message' in error && typeof error.message === 'string') {
+        return error.message
+      }
+      // Check for other common properties
+      if ('error' in error && typeof error.error === 'string') {
+        return error.error
+      }
+      // Stringify the object
+      return JSON.stringify(error)
+    } catch {
+      return '[object Object]'
+    }
+  }
+
+  return String(error)
+}
+
+/**
  * Log error to console and optionally send to external service
  */
 export function reportError(error: Error | unknown, severity: ErrorSeverity = ErrorSeverity.MEDIUM, context?: Record<string, unknown>): void {
+  const message = safeStringify(error)
+  const errorObj = error instanceof Error ? error : null
+
   const errorReport: ErrorReport = {
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
+    message,
+    stack: errorObj?.stack,
     severity,
     context,
     timestamp: new Date(),
@@ -42,22 +81,22 @@ export function reportError(error: Error | unknown, severity: ErrorSeverity = Er
     url: typeof window !== 'undefined' ? window.location.href : undefined
   }
 
-  // Log to console
+  // Log to console with proper formatting
   const logMethod = severity === ErrorSeverity.HIGH || severity === ErrorSeverity.CRITICAL
     ? console.error
     : severity === ErrorSeverity.MEDIUM
       ? console.warn
       : console.log
 
-  logMethod('Error reported:', errorReport)
+  logMethod('❌ Error:', message)
+  if (context) {
+    logMethod('   Context:', context)
+  }
+  if (errorReport.stack) {
+    logMethod('   Stack:', errorReport.stack)
+  }
 
   // TODO: Send to external error tracking service (Sentry, LogRocket, etc.)
-  // if (process.env.NEXT_PUBLIC_ERROR_TRACKING_URL) {
-  //   fetch(process.env.NEXT_PUBLIC_ERROR_TRACKING_URL, {
-  //     method: 'POST',
-  //     body: JSON.stringify(errorReport)
-  //   })
-  // }
 }
 
 /**
@@ -69,7 +108,7 @@ export function withErrorHandling<T extends (...args: unknown[]) => Promise<unkn
 ): T {
   return (async (...args: Parameters<T>) => {
     try {
-      return await fn(...args)
+      return await fn()
     } catch (error) {
       reportError(error, severity, { function: fn.name, args })
       throw error
@@ -114,7 +153,6 @@ export function withRetry<T extends (...args: unknown[]) => Promise<unknown>>(
 
     reportError(lastError, severity, {
       function: fn.name,
-      args,
       attempts: maxRetries + 1
     })
 

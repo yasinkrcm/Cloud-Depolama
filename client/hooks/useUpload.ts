@@ -100,6 +100,7 @@ export interface UseUploadReturn {
   retryUpload: (id: string) => Promise<void>
   pauseUpload: (id: string) => void
   resumeUpload: (id: string) => Promise<void>
+  attachFileAndResume: (id: string, file: File) => Promise<void>
   isUploading: boolean
   getUploadStatus: (id: string) => import('@/lib/store/uploadStore').UploadItem | undefined
 }
@@ -109,12 +110,13 @@ export interface UseUploadReturn {
  */
 export function useUpload(): UseUploadReturn {
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
-  const { addUpload, removeUpload, updateUpload, getUpload } = useUploadStore(
+  const { addUpload, removeUpload, updateUpload, getUpload, attachFileToUpload } = useUploadStore(
     useShallow((state) => ({
       addUpload: state.addUpload,
       removeUpload: state.removeUpload,
       updateUpload: state.updateUpload,
-      getUpload: state.getUpload
+      getUpload: state.getUpload,
+      attachFileToUpload: state.attachFileToUpload
     }))
   )
 
@@ -455,7 +457,28 @@ export function useUpload(): UseUploadReturn {
     } finally {
       abortControllersRef.current.delete(id)
     }
-  }, [getUpload, updateUpload])
+  }, [getUpload, updateUpload, attachFileToUpload])
+
+  /**
+   * Attach a re-selected file and resume upload (for after page refresh)
+   */
+  const attachFileAndResume = useCallback(async (id: string, file: File) => {
+    const upload = getUpload(id)
+    if (!upload) return
+
+    // Verify and attach file to store
+    const attached = attachFileToUpload(id, file)
+    if (!attached) {
+      updateUpload(id, {
+        status: 'failed',
+        error: 'File does not match. Please select the same file.'
+      })
+      return
+    }
+
+    // Now resume the upload
+    await resumeUpload(id)
+  }, [getUpload, attachFileToUpload, updateUpload, resumeUpload])
 
   return {
     uploadFile,
@@ -463,6 +486,7 @@ export function useUpload(): UseUploadReturn {
     retryUpload,
     pauseUpload,
     resumeUpload,
+    attachFileAndResume,
     isUploading: abortControllersRef.current.size > 0,
     getUploadStatus: getUpload
   }

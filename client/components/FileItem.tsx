@@ -109,12 +109,15 @@ function formatDate(dateString: string): string {
 interface FileItemProps {
   file: FileItem
   onDelete: () => void
+  isSelectMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: () => void
 }
 
 /**
  * File item component (Apple-style)
  */
-export function FileItemComponent({ file, onDelete }: FileItemProps) {
+export function FileItemComponent({ file, onDelete, isSelectMode = false, isSelected = false, onToggleSelect }: FileItemProps) {
   const [showHash, setShowHash] = useState(false)
   const [copied, setCopied] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -178,9 +181,47 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
   return (
     <>
       <div
-        className="group relative glass-panel rounded-2xl overflow-hidden hover:bg-white/5 transition-all duration-300 cursor-pointer"
-        onClick={() => setPreviewModalOpen(true)}
+        className={`group relative glass-panel rounded-2xl overflow-hidden hover:bg-white/5 transition-all duration-300 cursor-pointer ${
+          isSelected ? 'ring-2 ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : ''
+        }`}
+        onClick={(e) => {
+          // Don't trigger preview if clicking on action buttons
+          const target = e.target as HTMLElement
+          if (target.closest('[data-action-button]')) return
+
+          // Handle selection
+          if (isSelectMode && onToggleSelect) {
+            onToggleSelect()
+            return
+          }
+
+          setPreviewModalOpen(true)
+        }}
       >
+        {/* Selection mode checkbox overlay */}
+        {isSelectMode && (
+          <div
+            className="absolute top-3 left-3 z-20 pointer-events-auto"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelect?.()
+            }}
+            data-action-button="true"
+          >
+            <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-md border-2 flex items-center justify-center transition-all ${
+              isSelected
+                ? 'bg-blue-500 border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                : 'bg-black/40 border-white/30 backdrop-blur-sm'
+            }`}>
+              {isSelected && (
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Preview Area */}
         <div className="aspect-video relative overflow-hidden bg-black/50 border-b border-white/5">
           {isImage && !previewError ? (
@@ -252,7 +293,9 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
               href={downloadUrl}
               download={file.fileName}
               onClick={e => e.stopPropagation()}
-              className="p-2 bg-white/10 hover:bg-blue-500/20 backdrop-blur-md rounded-full text-white hover:text-blue-300 border border-white/10 hover:border-blue-500/30 sm:hover:scale-110 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all"
+              onPointerDown={e => e.stopPropagation()}
+              data-action-button="true"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/10 hover:bg-blue-500/20 backdrop-blur-md rounded-full text-white hover:text-blue-300 border border-white/10 hover:border-blue-500/30 sm:hover:scale-110 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all"
               title="İndir"
             >
               <svg className="w-4 h-4 drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
@@ -267,8 +310,10 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
                 e.stopPropagation()
                 handleDeleteClick()
               }}
+              onPointerDown={e => e.stopPropagation()}
+              data-action-button="true"
               disabled={isDeleting}
-              className="p-2 bg-white/10 hover:bg-red-500/20 backdrop-blur-md rounded-full text-white hover:text-red-400 border border-white/10 hover:border-red-500/30 sm:hover:scale-110 transition-all disabled:opacity-50"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/10 hover:bg-red-500/20 backdrop-blur-md rounded-full text-white hover:text-red-400 border border-white/10 hover:border-red-500/30 sm:hover:scale-110 transition-all disabled:opacity-50"
               title="Delete"
             >
               {isDeleting ? (

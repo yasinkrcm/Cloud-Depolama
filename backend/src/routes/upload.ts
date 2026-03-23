@@ -116,51 +116,10 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         }
       }
 
-      // Check if file with same hash already exists
-      const existingFile = await File.findByHash(fileHash)
-
-      // If file is already completed, return deduplication response
-      if (existingFile && existingFile.uploadStatus === 'completed') {
-        // Restore if it was soft-deleted
-        if (existingFile.isDeleted) {
-          existingFile.isDeleted = false
-          existingFile.set('deletedAt', undefined)
-          await existingFile.save()
-        }
-
-        return {
-          success: true,
-          fileId: existingFile._id.toString(),
-          uploadStatus: 'completed',
-          alreadyExists: true,
-          message: 'File already exists'
-        }
-      }
-
-      // If file exists but not completed (e.g., failed, pending), reuse it
-      if (existingFile) {
-        // Reset the existing file for retry
-        existingFile.uploadStatus = 'pending'
-        existingFile.uploadedChunks = []
-        existingFile.fileName = fileName
-        existingFile.fileSize = fileSize
-        existingFile.mimeType = mimeType
-        existingFile.chunkSize = chunkSize
-        existingFile.totalChunks = totalChunks
-        existingFile.isDeleted = false
-        existingFile.set('deletedAt', undefined)
-        await existingFile.save()
-
-        return {
-          success: true,
-          fileId: existingFile._id.toString(),
-          uploadStatus: 'pending',
-          reused: true
-        }
-      }
-
       // Calculate storage path for new file
-      const storagePath = join(STORAGE_DIR, fileHash)
+      // Use timestamp + hash suffix to avoid collisions for same content uploaded multiple times
+      const timestamp = Date.now()
+      const storagePath = join(STORAGE_DIR, `${fileHash}-${timestamp}`)
 
       // Create pending file record
       const file = await File.createPending(

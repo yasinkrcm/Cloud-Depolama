@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import React, { useCallback, useMemo, useRef } from 'react'
 import { useUpload } from '@/hooks/useUpload'
 import { useUploadStore, type UploadStatus } from '@/lib/store/uploadStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -60,6 +60,11 @@ function StatusIcon({ status }: { status: UploadStatus }) {
       <svg className="h-5 w-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
+    ),
+    needs_file: (
+      <svg className="h-5 w-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
     )
   }
 
@@ -79,7 +84,8 @@ function StatusLabel({ status }: { status: UploadStatus }) {
     completed: 'Tamamlandı',
     failed: 'Başarısız',
     cancelled: 'İptal Edildi',
-    paused: 'Duraklatıldı'
+    paused: 'Duraklatıldı',
+    needs_file: 'Dosya Seçilmeli'
   }
 
   const colors = {
@@ -91,7 +97,8 @@ function StatusLabel({ status }: { status: UploadStatus }) {
     completed: 'text-green-500',
     failed: 'text-red-500',
     cancelled: 'text-gray-400',
-    paused: 'text-yellow-500'
+    paused: 'text-yellow-500',
+    needs_file: 'text-orange-500'
   }
 
   return (
@@ -138,7 +145,8 @@ function UploadItemComponent({
   error,
   sha256
 }: UploadItemProps) {
-  const { cancelUpload, retryUpload, pauseUpload, resumeUpload } = useUpload()
+  const { cancelUpload, retryUpload, pauseUpload, resumeUpload, attachFileAndResume } = useUpload()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   /**
    * Handle retry button click
@@ -168,8 +176,26 @@ function UploadItemComponent({
     void resumeUpload(id)
   }, [id, resumeUpload])
 
+  /**
+   * Handle file selection for resume
+   */
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      void attachFileAndResume(id, file)
+    }
+  }, [id, attachFileAndResume])
+
+  /**
+   * Trigger file input
+   */
+  const triggerFileSelect = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
   const isActive = ['idle', 'hashing', 'initializing', 'uploading', 'completing'].includes(status)
   const isPaused = status === 'paused'
+  const needsFile = status === 'needs_file'
   const canRetry = status === 'failed'
   const canCancel = isActive
   const canPause = isActive
@@ -194,6 +220,30 @@ function UploadItemComponent({
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
+          {needsFile && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <button
+                type="button"
+                onClick={triggerFileSelect}
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-400 border border-orange-400/50 shadow-[0_0_15px_rgba(249,115,22,0.3)] rounded-lg transition-all"
+              >
+                Dosya Seç
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-3 py-1.5 text-xs font-semibold text-gray-300 bg-gray-600/20 hover:bg-gray-600/40 border border-gray-600/30 rounded-lg transition-colors"
+              >
+                İptal
+              </button>
+            </>
+          )}
           {canCancel && (
             <>
               <button
@@ -251,6 +301,13 @@ function UploadItemComponent({
         </div>
       )}
 
+      {/* Info message for needs_file */}
+      {needsFile && (
+        <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-md">
+          <p className="text-xs text-orange-700">Sayfa yenilendiği için dosyayı tekrar seçmeniz gerekiyor.</p>
+        </div>
+      )}
+
       {/* Error message */}
       {status === 'failed' && error && (
         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
@@ -298,6 +355,27 @@ export function UploadList() {
   }, [queue])
 
   /**
+   * Calculate queue statistics
+   */
+  const queueStats = useMemo(() => {
+    const active = sortedQueue.filter(item => ['idle', 'hashing', 'initializing', 'uploading', 'completing'].includes(item.status))
+    const completed = sortedQueue.filter(item => item.status === 'completed')
+    const failed = sortedQueue.filter(item => item.status === 'failed')
+    const paused = sortedQueue.filter(item => item.status === 'paused')
+    return { active, completed, failed, paused }
+  }, [sortedQueue])
+
+  /**
+   * Calculate overall progress across all active uploads
+   */
+  const overallProgress = useMemo(() => {
+    const activeUploads = queueStats.active
+    if (activeUploads.length === 0) return 0
+    const totalProgress = activeUploads.reduce((sum, item) => sum + item.progress, 0)
+    return Math.round(totalProgress / activeUploads.length)
+  }, [queueStats.active])
+
+  /**
    * Handle clear completed
    */
   const handleClearCompleted = useCallback(() => {
@@ -309,13 +387,36 @@ export function UploadList() {
   }
 
   const hasCompleted = sortedQueue.some((item) => item.status === 'completed')
+  const hasMultipleActive = queueStats.active.length > 1
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-2 px-2">
-        <h2 className="text-xl font-semibold text-white tracking-tight">
-          Aktif Yüklemeler <span className="text-gray-400 text-sm ml-2">({sortedQueue.length})</span>
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-white tracking-tight">
+            Aktif Yüklemeler <span className="text-gray-400 text-sm ml-2">({sortedQueue.length})</span>
+          </h2>
+          {/* Queue statistics pills */}
+          {(queueStats.completed.length > 0 || queueStats.failed.length > 0 || queueStats.paused.length > 0) && (
+            <div className="flex gap-1.5">
+              {queueStats.completed.length > 0 && (
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full border border-green-500/30">
+                  ✓ {queueStats.completed.length}
+                </span>
+              )}
+              {queueStats.failed.length > 0 && (
+                <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs font-medium rounded-full border border-red-500/30">
+                  ✗ {queueStats.failed.length}
+                </span>
+              )}
+              {queueStats.paused.length > 0 && (
+                <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full border border-yellow-500/30">
+                  ⏸ {queueStats.paused.length}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
         {hasCompleted && (
           <button
             type="button"
@@ -326,6 +427,24 @@ export function UploadList() {
           </button>
         )}
       </div>
+
+      {/* Overall progress bar (only when multiple active uploads) */}
+      {hasMultipleActive && (
+        <div className="glass-panel rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-300">
+              Genel İlerleme ({queueStats.active.length} dosya)
+            </span>
+            <span className="text-sm font-semibold text-blue-400">{overallProgress}%</span>
+          </div>
+          <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden border border-gray-700/50">
+            <div
+              className="h-2 bg-gradient-to-r from-blue-500 to-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.6)] transition-all duration-300 ease-out"
+              style={{ width: `${overallProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {sortedQueue.map((item) => (
         <UploadItemComponent

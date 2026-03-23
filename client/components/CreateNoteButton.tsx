@@ -15,8 +15,8 @@ export function CreateNoteButton() {
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) return
     
-    // Create a physical File object from the string content
-    const file = new File([content], `${title.trim()}.txt`, { type: 'text/plain' })
+    // Create a physical File object from the string content with UTF-8 charset
+    const file = new File([content], `${title.trim()}.txt`, { type: 'text/plain;charset=utf-8' })
     
     // Upload it using the existing robust chunked upload system!
     await uploadFile(file, undefined, () => {

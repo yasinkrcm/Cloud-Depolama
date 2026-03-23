@@ -140,6 +140,11 @@ import { authRoutes, requireAuth } from './routes/auth.js'
 app.use(authRoutes)
 
 /**
+ * Register upload routes (public - requires auth token in request body, not cookie)
+ */
+app.use(uploadRoutes)
+
+/**
  * Authentication Barrier 🛑
  * All routes registered below this block will require a valid JWT cookie
  */
@@ -190,11 +195,6 @@ app.get('/stats', async () => {
 })
 
 /**
- * Register upload routes
- */
-app.use(uploadRoutes)
-
-/**
  * GET /files/:id/download
  * Download a file by ID (stream)
  */
@@ -236,13 +236,13 @@ app.get('/files/:id/download', async ({ params, query, set }) => {
 
     // Set headers
     set.headers['Content-Type'] = file.mimeType || 'application/octet-stream'
-    
-    // Feature: Support inline preview rendering for Google Drive UI
-    if (query && query.inline === 'true') {
-      set.headers['Content-Disposition'] = `inline; filename="${file.fileName}"`
-    } else {
-      set.headers['Content-Disposition'] = `attachment; filename="${file.fileName}"`
-    }
+
+    // RFC 5987 compliant encoding for non-ASCII filenames (Turkish characters: ş, ı, ğ, ö, ç, ü)
+    // This prevents "Header has invalid value" errors in Bun/Elysia
+    const asciiFallback = file.fileName.replace(/[^\x00-\x7F]/g, '_')
+    const encodedFileName = encodeURIComponent(file.fileName)
+    const disposition = (query && query.inline === 'true') ? 'inline' : 'attachment'
+    set.headers['Content-Disposition'] = `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`
     
     set.headers['X-SHA256'] = file.sha256
 

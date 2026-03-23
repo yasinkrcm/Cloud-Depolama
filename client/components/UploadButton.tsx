@@ -21,27 +21,34 @@ export function UploadButton() {
   const queryClient = useQueryClient()
 
   /**
-   * Handle file selection
+   * Handle file selection - start all uploads in parallel
    */
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
-    const MAX_FILE_SIZE = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 53687091200; // 50GB default
+    const MAX_FILE_SIZE = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 53687091200 // 50GB default
+    const validFiles: File[] = []
 
+    // Validate files first
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      
+
       if (file && file.size > MAX_FILE_SIZE) {
         alert(`Dosya boyutu ${(MAX_FILE_SIZE / (1024 * 1024 * 1024)).toFixed(1)}GB limitini aşıyor: ${file.name}`)
         continue
       }
-      
+
       if (file && file.size > 0) {
-        await uploadFile(file, undefined, () => {
-          void queryClient.invalidateQueries({ queryKey: ['files'] })
-        })
+        validFiles.push(file)
       }
     }
+
+    // Start all uploads in parallel (don't await, let them run concurrently)
+    validFiles.forEach(file => {
+      void uploadFile(file, undefined, () => {
+        void queryClient.invalidateQueries({ queryKey: ['files'] })
+      })
+    })
   }, [uploadFile, queryClient])
 
   /**
