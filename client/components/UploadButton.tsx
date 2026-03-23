@@ -26,7 +26,7 @@ export function UploadButton() {
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
-    const MAX_FILE_SIZE = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 10737418240;
+    const MAX_FILE_SIZE = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE) || 53687091200; // 50GB default
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]

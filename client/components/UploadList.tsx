@@ -182,7 +182,7 @@ function UploadItemComponent({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3">
             <StatusIcon status={status} />
-            <p className="text-sm font-semibold text-gray-200 truncate tracking-wide">
+            <p className="text-sm sm:text-base font-semibold text-gray-200 truncate tracking-wide">
               {fileName}
             </p>
           </div>

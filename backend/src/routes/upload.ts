@@ -16,7 +16,7 @@ import mongoose from 'mongoose'
  * Storage directory configuration
  */
 const STORAGE_DIR = process.env.STORAGE_DIR || './storage'
-const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE) || 10737418240
+const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE) || 53687091200 // 50GB default
 
 
 /**

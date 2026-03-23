@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { getDownloadUrl, type FileItem } from '@/hooks/useFiles'
 import { API_BASE_URL } from '@/lib/api'
 import { FilePreviewModal } from './FilePreviewModal'
+import { DeleteModal } from './DeleteModal'
 
 /**
  * File icon by MIME type
@@ -119,6 +120,7 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [previewError, setPreviewError] = useState(false)
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 
   const isImage = file.mimeType?.startsWith('image/')
   const isVideo = file.mimeType?.startsWith('video/')
@@ -135,20 +137,35 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
   }
 
   /**
-   * Handle delete with confirmation
+   * Handle delete with confirmation modal
    */
-  const handleDelete = async () => {
-    if (!confirm(`"${file.fileName}" dosyasını kalıcı olarak silmek istediğinize emin misiniz?`)) return
+  const handleDeleteClick = () => {
+    setDeleteModalOpen(true)
+  }
 
+  /**
+   * Confirm delete
+   */
+  const handleDeleteConfirm = async () => {
     setIsDeleting(true)
     try {
       const response = await fetch(`${API_BASE_URL}/files/${file.id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error('Failed to delete')
+      setDeleteModalOpen(false)
       onDelete()
     } catch {
-      alert('Dosya silinirken bir hata oluştu.')
+      // Error handling - modal stays open
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  /**
+   * Cancel delete
+   */
+  const handleDeleteCancel = () => {
+    if (!isDeleting) {
+      setDeleteModalOpen(false)
     }
   }
 
@@ -227,9 +244,9 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
           )}
         </div>
 
-        {/* Content Overlay - Actions on hover (desktop), always visible on mobile */}
-        <div className="absolute inset-0 bg-black/60 opacity-100 sm:opacity-0 group-hover:sm:opacity-100 transition-opacity backdrop-blur-sm">
-          <div className="absolute top-3 right-3 flex gap-2 translate-y-0 sm:translate-y-[-10px] group-hover:sm:translate-y-0 transition-all duration-300">
+        {/* Content Overlay - Actions on hover (desktop), always visible on mobile without blur */}
+        <div className="absolute inset-0 bg-transparent sm:bg-black/60 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-none sm:backdrop-blur-sm pointer-events-none sm:pointer-events-auto">
+          <div className="absolute top-3 right-3 flex gap-2 translate-y-0 sm:translate-y-[-10px] sm:group-hover:translate-y-0 transition-all duration-300 pointer-events-auto">
             {/* Download */}
             <a
               href={downloadUrl}
@@ -248,7 +265,7 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                handleDelete()
+                handleDeleteClick()
               }}
               disabled={isDeleting}
               className="p-2 bg-white/10 hover:bg-red-500/20 backdrop-blur-md rounded-full text-white hover:text-red-400 border border-white/10 hover:border-red-500/30 sm:hover:scale-110 transition-all disabled:opacity-50"
@@ -272,10 +289,10 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
         <div className="p-3 sm:p-5">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-100 truncate text-sm" title={file.fileName}>
+              <h3 className="font-semibold text-gray-100 truncate text-sm sm:text-base" title={file.fileName}>
                 {file.fileName}
               </h3>
-              <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1">
+              <p className="text-xs text-gray-400 mt-1">
                 {formatFileSize(file.fileSize)} · {formatDate(file.uploadedAt)}
               </p>
             </div>
@@ -332,6 +349,13 @@ export function FileItemComponent({ file, onDelete }: FileItemProps) {
         </div>
       </div>
       {previewModalOpen && <FilePreviewModal file={file} onClose={() => setPreviewModalOpen(false)} />}
+      <DeleteModal
+        fileName={file.fileName}
+        isOpen={deleteModalOpen}
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </>
   )
 }
