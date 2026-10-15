@@ -41,7 +41,9 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
 
     const fetchTextContent = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/files/${file.id}/download?inline=true`)
+        const response = await fetch(`${API_BASE_URL}/files/${file.id}/download?inline=true`, {
+          credentials: 'include'
+        })
         if (!response.ok) throw new Error('Failed to fetch')
         const text = await response.text()
         setTextContent(text)
@@ -52,7 +54,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
       }
     }
 
-    fetchTextContent()
+    void fetchTextContent()
   }, [file])
 
   // Prevent back body scrolling
@@ -159,7 +161,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
         <div className="flex-1 overflow-auto bg-black/50 relative min-h-0 flex items-center justify-center p-2 sm:p-6 md:p-8">
           {isImage ? (
             <div className={`w-full h-full flex ${isZoomed ? 'items-start justify-start' : 'items-center justify-center'} overflow-auto`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* Image element by design — flat eslint config does not load @next/next rules */}
               <img
                 src={previewUrl}
                 alt={file.fileName}

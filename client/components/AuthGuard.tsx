@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { api } from '@/lib/api'
+import { authApi } from '@/lib/api'
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -18,12 +18,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const checkAuth = async () => {
       try {
-        const { data, error } = await (api as any).api.auth.me.get()
+        const { data, error } = await authApi.api.auth.me.get()
         if (data?.success && !error) {
           setIsAuthenticated(true)
         } else {
           // Verify if there's any user registered in DB at all
-          const { data: statusData } = await (api as any).api.auth['setup-status'].get()
+          const { data: statusData } = await authApi.api.auth['setup-status'].get()
           if (statusData?.hasUser) {
             router.replace('/login')
           } else {
@@ -36,7 +36,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       }
     }
 
-    checkAuth()
+    void checkAuth()
   }, [pathname, router])
 
   if (isAuthenticated === null) {

@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
+import { authApi } from '@/lib/api'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -17,14 +15,14 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { data, error: apiError } = await (api as any).api.auth.login.post({ email, password })
+      const { data, error: apiError } = await authApi.api.auth.login.post({ email, password })
       if (apiError || !data?.success) {
         setError(data?.error || apiError?.value?.error || 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.')
       } else {
         // Force full page reload to clear any cached states and re-run AuthGuard
         window.location.href = '/'
       }
-    } catch (err) {
+    } catch {
       setError('Giriş yapılırken bir ağ hatası oluştu.')
     } finally {
       setLoading(false)
@@ -54,7 +52,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={(e) => { void handleLogin(e) }} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold tracking-wider text-gray-400 uppercase mb-2 ml-1">E-POSTA ADRESİ</label>
             <input 

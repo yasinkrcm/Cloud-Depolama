@@ -174,12 +174,12 @@ export function FileList() {
       // Delete all selected files
       await Promise.all(
         Array.from(selectedIds).map(id =>
-          fetch(`${API_BASE_URL}/files/${id}`, { method: 'DELETE' })
+          fetch(`${API_BASE_URL}/files/${id}`, { method: 'DELETE', credentials: 'include' })
         )
       )
       setBulkDeleteModalOpen(false)
       exitSelectMode()
-      refetch()
+      void refetch()
     } catch {
       // Error handling - modal stays open
     } finally {
@@ -210,7 +210,7 @@ export function FileList() {
 
         <button
           type="button"
-          onClick={() => refetch()}
+          onClick={() => { void refetch() }}
           className="p-1.5 sm:p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
           title="Yenile"
         >
@@ -368,7 +368,7 @@ export function FileList() {
           <p className="text-red-400 font-medium tracking-wide">Dosyalar yüklenemedi</p>
           <button
             type="button"
-            onClick={() => refetch()}
+            onClick={() => { void refetch() }}
             className="mt-2 text-sm text-red-400 hover:text-red-300 underline underline-offset-4"
           >
             Tekrar dene
@@ -395,7 +395,7 @@ export function FileList() {
             <FileItemComponent
               key={file.id}
               file={file}
-              onDelete={() => refetch()}
+              onDelete={() => { void refetch() }}
               isSelectMode={isSelectMode}
               isSelected={selectedIds.has(file.id)}
               onToggleSelect={() => toggleSelect(file.id)}
@@ -409,7 +409,7 @@ export function FileList() {
         count={selectedIds.size}
         isOpen={bulkDeleteModalOpen}
         isDeleting={isDeleting}
-        onConfirm={handleBulkDelete}
+        onConfirm={() => { void handleBulkDelete() }}
         onCancel={() => setBulkDeleteModalOpen(false)}
       />
     </div>

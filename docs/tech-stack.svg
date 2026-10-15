@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="620" viewBox="0 0 940 620" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0f1a"/>
+      <stop offset="1" stop-color="#131a2b"/>
+    </linearGradient>
+    <linearGradient id="tileBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="tilePurple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="tileGreen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#059669"/>
+      <stop offset="1" stop-color="#065f46"/>
+    </linearGradient>
+    <linearGradient id="tileOrange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ea580c"/>
+      <stop offset="1" stop-color="#c2410c"/>
+    </linearGradient>
+    <linearGradient id="tileRose" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e11d48"/>
+      <stop offset="1" stop-color="#9f1239"/>
+    </linearGradient>
+    <linearGradient id="tube" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="tube2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="tube3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#3b82f6" flood-opacity="0.35"/>
+    </filter>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="940" height="620" rx="28" fill="url(#bg)"/>
+  <circle cx="150" cy="110" r="90" fill="#2563eb" opacity="0.12"/>
+  <circle cx="830" cy="520" r="120" fill="#a855f7" opacity="0.10"/>
+  <circle cx="720" cy="90" r="60" fill="#10b981" opacity="0.08"/>
+
+  <!-- Title -->
+  <text x="470" y="52" text-anchor="middle" fill="#f8fafc" font-size="26" font-weight="700" letter-spacing="1">Cloud-Depolama · Tech Stack</text>
+  <text x="470" y="78" text-anchor="middle" fill="#94a3b8" font-size="13">Single-user, resumable chunked upload system with SHA-256 verified integrity</text>
+
+  <!-- CLIENT column -->
+  <g font-family="inherit">
+    <rect x="45" y="110" width="205" height="42" rx="14" fill="url(#tileBlue)" filter="url(#cardShadow)"/>
+    <text x="147" y="137" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">CLIENT</text>
+
+    <g filter="url(#cardShadow)">
+      <rect x="45" y="170" width="205" height="118" rx="16" fill="#111827" stroke="#3b82f6" stroke-opacity="0.35"/>
+      <rect x="63" y="188" width="169" height="24" rx="7" fill="url(#tileBlue)"/>
+      <text x="147" y="205" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Next.js 15 · App Router</text>
+      <rect x="63" y="220" width="169" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="147" y="237" text-anchor="middle" fill="#cbd5e1" font-size="12">React 19</text>
+      <rect x="63" y="252" width="169" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="147" y="269" text-anchor="middle" fill="#cbd5e1" font-size="12">TanStack Query v5</text>
+    </g>
+
+    <g filter="url(#cardShadow)">
+      <rect x="45" y="304" width="205" height="86" rx="16" fill="#111827" stroke="#8b5cf6" stroke-opacity="0.35"/>
+      <rect x="63" y="322" width="169" height="24" rx="7" fill="url(#tilePurple)"/>
+      <text x="147" y="339" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Zustand Store</text>
+      <rect x="63" y="354" width="169" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="147" y="371" text-anchor="middle" fill="#cbd5e1" font-size="12">Tailwind CSS · dark glass UI</text>
+    </g>
+  </g>
+
+  <!-- TRANSPORT column -->
+  <g>
+    <rect x="355" y="110" width="230" height="42" rx="14" fill="url(#tileRose)" filter="url(#cardShadow)"/>
+    <text x="470" y="137" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">TYPE-SAFE TRANSPORT</text>
+
+    <g filter="url(#cardShadow)">
+      <rect x="355" y="170" width="230" height="118" rx="16" fill="#111827" stroke="#e11d48" stroke-opacity="0.35"/>
+      <rect x="373" y="188" width="194" height="24" rx="7" fill="url(#tileRose)"/>
+      <text x="470" y="205" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Eden Treaty (typed client)</text>
+      <rect x="373" y="220" width="194" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="470" y="237" text-anchor="middle" fill="#cbd5e1" font-size="12">Client-side SHA-256 hashing</text>
+      <rect x="373" y="252" width="194" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="470" y="269" text-anchor="middle" fill="#cbd5e1" font-size="12">AbortController · pause/resume</text>
+    </g>
+
+    <g filter="url(#cardShadow)">
+      <rect x="355" y="304" width="230" height="86" rx="16" fill="#111827" stroke="#f97316" stroke-opacity="0.35"/>
+      <rect x="373" y="322" width="194" height="24" rx="7" fill="url(#tileOrange)"/>
+      <text x="470" y="339" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">@cloud-storage/types</text>
+      <rect x="373" y="354" width="194" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="470" y="371" text-anchor="middle" fill="#cbd5e1" font-size="12">Shared contracts · TypeBox</text>
+    </g>
+  </g>
+
+  <!-- BACKEND column -->
+  <g>
+    <rect x="690" y="110" width="205" height="42" rx="14" fill="url(#tileOrange)" filter="url(#cardShadow)"/>
+    <text x="792" y="137" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">BACKEND</text>
+
+    <g filter="url(#cardShadow)">
+      <rect x="690" y="170" width="205" height="118" rx="16" fill="#111827" stroke="#f97316" stroke-opacity="0.35"/>
+      <rect x="708" y="188" width="169" height="24" rx="7" fill="url(#tileOrange)"/>
+      <text x="792" y="205" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Bun runtime</text>
+      <rect x="708" y="220" width="169" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="792" y="237" text-anchor="middle" fill="#cbd5e1" font-size="12">ElysiaJS + Elysia.t schemas</text>
+      <rect x="708" y="252" width="169" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="792" y="269" text-anchor="middle" fill="#cbd5e1" font-size="12">JWT auth · bcrypt · rate limit</text>
+    </g>
+
+    <g filter="url(#cardShadow)">
+      <rect x="690" y="304" width="205" height="86" rx="16" fill="#111827" stroke="#10b981" stroke-opacity="0.35"/>
+      <rect x="708" y="322" width="169" height="24" rx="7" fill="url(#tileGreen)"/>
+      <text x="792" y="339" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Streaming I/O</text>
+      <rect x="708" y="354" width="169" height="24" rx="7" fill="#1e293b" stroke="#334155"/>
+      <text x="792" y="371" text-anchor="middle" fill="#cbd5e1" font-size="12">HTTP Range · chunks to disk</text>
+    </g>
+  </g>
+
+  <!-- Horizontal tubes -->
+  <g>
+    <path d="M 250 229 H 355" stroke="url(#tube)" stroke-width="5" marker-end="url(#arrow)" opacity="0.9"/>
+    <text x="302" y="219" text-anchor="middle" fill="#94a3b8" font-size="10">Eden Treaty</text>
+    <path d="M 585 229 H 690" stroke="url(#tube2)" stroke-width="5" marker-end="url(#arrow)" opacity="0.9"/>
+    <text x="637" y="219" text-anchor="middle" fill="#94a3b8" font-size="10">typed App</text>
+    <path d="M 250 347 H 355" stroke="url(#tube)" stroke-width="4" marker-end="url(#arrow)" opacity="0.75"/>
+    <text x="302" y="340" text-anchor="middle" fill="#94a3b8" font-size="10">multipart chunks</text>
+    <path d="M 585 347 H 690" stroke="url(#tube2)" stroke-width="4" marker-end="url(#arrow)" opacity="0.75"/>
+    <text x="637" y="340" text-anchor="middle" fill="#94a3b8" font-size="10">fetch · FormData</text>
+  </g>
+
+  <!-- Vertical tube to DATA -->
+  <path d="M 470 390 V 445" stroke="url(#tube3)" stroke-width="5" marker-end="url(#arrow)" opacity="0.9"/>
+  <text x="530" y="420" fill="#94a3b8" font-size="11">SHA-256 verify · resume-safe</text>
+
+  <!-- DATA row -->
+  <g>
+    <rect x="45" y="445" width="850" height="120" rx="20" fill="#0d1426" stroke="#1e293b" filter="url(#cardShadow)"/>
+    <text x="90" y="478" fill="#f8fafc" font-size="15" font-weight="700">DATA LAYER</text>
+
+    <g filter="url(#glow)">
+      <rect x="90" y="494" width="230" height="52" rx="12" fill="#111827" stroke="#10b981" stroke-opacity="0.5"/>
+      <rect x="90" y="494" width="6" height="52" rx="3" fill="#10b981"/>
+      <text x="110" y="517" fill="#34d399" font-size="12" font-weight="700">MongoDB</text>
+      <text x="110" y="534" fill="#94a3b8" font-size="11">File metadata · Mongoose</text>
+    </g>
+
+    <g>
+      <rect x="365" y="494" width="230" height="52" rx="12" fill="#111827" stroke="#f97316" stroke-opacity="0.5"/>
+      <rect x="365" y="494" width="6" height="52" rx="3" fill="#f97316"/>
+      <text x="385" y="517" fill="#fb923c" font-size="12" font-weight="700">Disk Storage</text>
+      <text x="385" y="534" fill="#94a3b8" font-size="11">chunk - {i} + final file · {hash}-{ts}</text>
+    </g>
+
+    <g>
+      <rect x="640" y="494" width="255" height="52" rx="12" fill="#111827" stroke="#3b82f6" stroke-opacity="0.5"/>
+      <rect x="640" y="494" width="6" height="52" rx="3" fill="#3b82f6"/>
+      <text x="660" y="517" fill="#60a5fa" font-size="12" font-weight="700">Integrity Pipeline</text>
+      <text x="660" y="534" fill="#94a3b8" font-size="11">chunkHash → finalHash → init-hash</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <text x="470" y="595" text-anchor="middle" fill="#64748b" font-size="11">Bun monorepo · TypeScript strict · streams end-to-end</text>
+</svg>

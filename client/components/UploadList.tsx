@@ -198,7 +198,6 @@ function UploadItemComponent({
   const needsFile = status === 'needs_file'
   const canRetry = status === 'failed'
   const canCancel = isActive
-  const canPause = isActive
   const canResume = isPaused
 
   return (

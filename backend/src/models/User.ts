@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'
+import mongoose, { type Model } from 'mongoose'
 
 export interface IUser {
   email: string
@@ -7,7 +7,15 @@ export interface IUser {
   updatedAt: Date
 }
 
-const UserSchema = new mongoose.Schema<IUser>({
+/**
+ * Full document interface for the User model
+ */
+export interface IUserDocument extends mongoose.Document {
+  email: string
+  passwordHash: string
+}
+
+const UserSchema = new mongoose.Schema<IUserDocument>({
   email: { 
     type: String, 
     required: true, 
@@ -23,4 +31,6 @@ const UserSchema = new mongoose.Schema<IUser>({
   timestamps: true
 })
 
-export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema)
+export const User =
+  ((mongoose.models.User as Model<IUserDocument> | undefined) ||
+  mongoose.model<IUserDocument>('User', UserSchema)) as Model<IUserDocument>

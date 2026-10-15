@@ -32,7 +32,7 @@ export function useFiles() {
   return useQuery({
     queryKey: ['files'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/files`)
+      const response = await fetch(`${API_BASE_URL}/files`, { credentials: 'include' })
       if (!response.ok) {
         throw new Error('Failed to fetch files')
       }
@@ -55,7 +55,8 @@ export function useDeleteFile() {
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`${API_BASE_URL}/files/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       })
       if (!response.ok) {
         throw new Error('Failed to delete file')
@@ -64,7 +65,7 @@ export function useDeleteFile() {
     },
     onSuccess: () => {
       // Refetch files list
-      queryClient.invalidateQueries({ queryKey: ['files'] })
+      void queryClient.invalidateQueries({ queryKey: ['files'] })
     }
   })
 }

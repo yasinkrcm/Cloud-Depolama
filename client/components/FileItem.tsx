@@ -8,8 +8,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { getDownloadUrl, type FileItem } from '@/hooks/useFiles'
+import { type FileItem } from '@/hooks/useFiles'
 import { API_BASE_URL } from '@/lib/api'
 import { FilePreviewModal } from './FilePreviewModal'
 import { DeleteModal } from './DeleteModal'
@@ -152,7 +151,7 @@ export function FileItemComponent({ file, onDelete, isSelectMode = false, isSele
   const handleDeleteConfirm = async () => {
     setIsDeleting(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/files/${file.id}`, { method: 'DELETE' })
+      const response = await fetch(`${API_BASE_URL}/files/${file.id}`, { method: 'DELETE', credentials: 'include' })
       if (!response.ok) throw new Error('Failed to delete')
       setDeleteModalOpen(false)
       onDelete()
@@ -231,7 +230,7 @@ export function FileItemComponent({ file, onDelete, isSelectMode = false, isSele
                 className="absolute inset-0 bg-cover bg-center opacity-40 blur-xl scale-125"
                 style={{ backgroundImage: `url(${previewUrl})` }}
               />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* Image element by design — flat eslint config does not load @next/next rules */}
                 <img
                   src={previewUrl}
                   alt={file.fileName}
@@ -367,7 +366,7 @@ export function FileItemComponent({ file, onDelete, isSelectMode = false, isSele
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    copyHash()
+                    void copyHash()
                   }}
                   className="text-[11px] font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors px-2 py-0.5 rounded-full hover:bg-blue-500/10"
                 >
@@ -398,7 +397,7 @@ export function FileItemComponent({ file, onDelete, isSelectMode = false, isSele
         fileName={file.fileName}
         isOpen={deleteModalOpen}
         isDeleting={isDeleting}
-        onConfirm={handleDeleteConfirm}
+        onConfirm={() => { void handleDeleteConfirm() }}
         onCancel={handleDeleteCancel}
       />
     </>

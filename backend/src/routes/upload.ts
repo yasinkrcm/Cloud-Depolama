@@ -1,23 +1,50 @@
 /**
  * @file upload.ts
  * @role Chunked file upload routes with SHA-256 verification
- * @depends Elysia, File model, crypto.subtle, fs
+ * @depends Elysia, File model, node:crypto, node:fs (streams)
  * @dataflow Client → init upload → chunk uploads → verify SHA-256 → complete
  */
 
 import { Elysia, t } from 'elysia'
 import { File } from '../models/File.js'
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { mkdir, rm, unlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { finished, pipeline } from 'node:stream/promises'
+import { Transform } from 'node:stream'
 import mongoose from 'mongoose'
 
 /**
- * Storage directory configuration
+ * Storage directory (absolute, so path-containment checks are reliable)
  */
-const STORAGE_DIR = process.env.STORAGE_DIR || './storage'
-const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE) || 53687091200 // 50GB default
+const STORAGE_DIR = resolve(process.env.STORAGE_DIR || './storage')
 
+/**
+ * Maximum upload file size (default 50GB)
+ */
+const MAX_FILE_SIZE = Number(process.env.MAX_FILE_SIZE) || 53687091200 // 50GB
+
+/**
+ * Maximum number of chunks per upload (disk-exhaustion guard)
+ */
+const MAX_TOTAL_CHUNKS = 100000
+
+/**
+ * Matches a hex-encoded SHA-256 digest
+ */
+const HEX256_RE = /^[a-f0-9]{64}$/i
+
+/**
+ * Restricts mimeType to a safe "type/subtype" token shape (prevents header injection)
+ */
+export const MIME_TYPE_RE = /^[\w.+-]+\/[\w.+-]+$/
+
+/**
+ * Mimetypes that may be served inline; everything else is forced to attachment
+ */
+export const SAFE_INLINE_MIME_RE = /^(image\/|video\/|audio\/|application\/pdf)/
 
 /**
  * Ensure storage directory exists
@@ -26,6 +53,40 @@ async function ensureStorageDir() {
   if (!existsSync(STORAGE_DIR)) {
     await mkdir(STORAGE_DIR, { recursive: true })
   }
+}
+
+/**
+ * Returns true when a target path is strictly contained within a base directory
+ * (relative paths are resolved, traversal must never escape the base)
+ */
+function isWithinDir(base: string, target: string): boolean {
+  const rel = relative(resolve(base), resolve(target))
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+/**
+ * Verify a stored/derived path is strictly contained within STORAGE_DIR.
+ * Defense-in-depth against tampered database records.
+ */
+export function isStoragePathSafe(storagePath: string, fileName?: string): boolean {
+  if (!isWithinDir(STORAGE_DIR, storagePath)) return false
+  if (fileName === undefined) return true
+  return isWithinDir(storagePath, join(storagePath, fileName))
+}
+
+/**
+ * Sanitize a client-supplied file name into a safe on-disk name.
+ * Strips directory components and every character that could enable
+ * path traversal or filesystem special files.
+ */
+function getSafeFileName(fileName: string): string {
+  const safe = basename(fileName)
+    .replace(/[/\\:*?"<>|]/g, '_')
+    .replace(/\p{C}+/gu, '_')
+    .trim()
+
+  if (!safe || safe === '.' || safe === '..') return 'file'
+  return safe.slice(0, 255)
 }
 
 /**
@@ -46,7 +107,7 @@ function validateFileId(fileId: unknown): string | null {
 }
 
 /**
- * Verify SHA-256 hash of data
+ * Verify SHA-256 hash of data. Never leaks the actual digests to the client.
  * @throws Error if hash doesn't match
  */
 async function verifySha256(data: ArrayBuffer, expectedHash: string): Promise<void> {
@@ -54,21 +115,11 @@ async function verifySha256(data: ArrayBuffer, expectedHash: string): Promise<vo
   const hashHex = Buffer.from(hashBuffer).toString('hex')
 
   if (hashHex !== expectedHash) {
-    throw new Error(`SHA-256 verification failed: expected ${expectedHash}, got ${hashHex}`)
+    console.error(`Chunk SHA-256 verification failed: expected ${expectedHash}, got ${hashHex}`)
+    throw new Error('Chunk hash verification failed')
   }
 }
 
-/**
- * Calculate SHA-256 hash of data
- */
-async function calculateSha256(data: ArrayBuffer): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  return Buffer.from(hashBuffer).toString('hex')
-}
-
-/**
- * Schema definitions using TypeBox
- */
 const InitUploadSchema = t.Object({
   fileName: t.String(),
   fileSize: t.Number(),
@@ -99,11 +150,11 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
       const { fileName, fileSize, mimeType, chunkSize, totalChunks, fileHash } = body
 
       // Validate max file size
-      if (fileSize > MAX_FILE_SIZE) {
+      if (fileSize <= 0 || fileSize > MAX_FILE_SIZE) {
         set.status = 400
         return {
           success: false,
-          error: `fileSize exceeds the maximum limit of ${MAX_FILE_SIZE} bytes`
+          error: `fileSize must be positive and not exceed ${MAX_FILE_SIZE} bytes`
         }
       }
 
@@ -116,14 +167,50 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         }
       }
 
+      // Validate chunk geometry consistency (prevents unbounded per-chunk writes)
+      if (
+        !Number.isInteger(totalChunks) ||
+        totalChunks < 1 ||
+        totalChunks > MAX_TOTAL_CHUNKS ||
+        totalChunks * chunkSize < fileSize ||
+        (totalChunks - 1) * chunkSize >= fileSize
+      ) {
+        set.status = 400
+        return {
+          success: false,
+          error: 'fileSize/chunkSize/totalChunks are inconsistent'
+        }
+      }
+
+      // Reject traversal vectors: fileHash must be a hex SHA-256 digest
+      if (!HEX256_RE.test(fileHash)) {
+        set.status = 400
+        return {
+          success: false,
+          error: 'fileHash must be a hex-encoded SHA-256 hash'
+        }
+      }
+
+      // Reject header injection via mimeType
+      if (!MIME_TYPE_RE.test(mimeType)) {
+        set.status = 400
+        return {
+          success: false,
+          error: 'mimeType must be a valid type/subtype string'
+        }
+      }
+
+      // Sanitize fileName: strip directory components and traversal characters
+      const safeFileName = getSafeFileName(fileName)
+
       // Calculate storage path for new file
       // Use timestamp + hash suffix to avoid collisions for same content uploaded multiple times
       const timestamp = Date.now()
       const storagePath = join(STORAGE_DIR, `${fileHash}-${timestamp}`)
 
-      // Create pending file record
+      // Create pending file record with the sanitized name
       const file = await File.createPending(
-        fileName,
+        safeFileName,
         fileSize,
         mimeType,
         fileHash,
@@ -179,12 +266,12 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         }
       }
 
-      // Validate chunkHash
-      if (!chunkHash || typeof chunkHash !== 'string' || chunkHash.trim() === '') {
+      // Validate chunkHash format
+      if (!chunkHash || typeof chunkHash !== 'string' || !HEX256_RE.test(chunkHash)) {
         set.status = 400
         return {
           success: false,
-          error: 'chunkHash is required'
+          error: 'chunkHash must be a hex-encoded SHA-256 hash'
         }
       }
 
@@ -204,6 +291,23 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         return {
           success: false,
           error: 'File not found'
+        }
+      }
+
+      // Reject uploads to completed records and out-of-range indexes
+      // (prevents unbounded distinct chunk files → disk exhaustion)
+      if (file.uploadStatus === 'completed') {
+        set.status = 400
+        return {
+          success: false,
+          error: 'Upload already completed'
+        }
+      }
+      if (chunkIndex >= file.totalChunks) {
+        set.status = 400
+        return {
+          success: false,
+          error: 'chunkIndex exceeds totalChunks'
         }
       }
 
@@ -232,15 +336,17 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         chunkArrayBuffer = new TextEncoder().encode(str).buffer
       }
 
-      // Verify chunk size matches expected
-      if (file.chunkSize !== chunkArrayBuffer.byteLength) {
-        // Last chunk may be smaller
-        if (chunkIndex !== file.totalChunks - 1) {
-          set.status = 400
-          return {
-            success: false,
-            error: `Chunk size mismatch: expected ${file.chunkSize}, got ${chunkArrayBuffer.byteLength}`
-          }
+      // Enforce exact per-chunk size derived from fileSize (last chunk may be smaller,
+      // so an oversized body can never slip through as the "final chunk")
+      const expectedSize =
+        chunkIndex === file.totalChunks - 1
+          ? file.fileSize - (file.totalChunks - 1) * file.chunkSize
+          : file.chunkSize
+      if (chunkArrayBuffer.byteLength !== expectedSize) {
+        set.status = 400
+        return {
+          success: false,
+          error: `Chunk size mismatch: expected ${expectedSize} bytes for this chunk`
         }
       }
 
@@ -251,12 +357,28 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         set.status = 400
         return {
           success: false,
-          error: err instanceof Error ? err.message : 'Hash verification failed'
+          error: err instanceof Error ? err.message : 'Chunk hash verification failed'
+        }
+      }
+
+      // Path containment: chunk files must land inside the validated storage directory
+      if (!isStoragePathSafe(file.storagePath)) {
+        set.status = 500
+        return {
+          success: false,
+          error: 'Invalid storage path'
         }
       }
 
       // Write chunk to disk (stream-like approach)
       const chunkPath = join(file.storagePath, `chunk-${chunkIndex}`)
+      if (!isWithinDir(file.storagePath, chunkPath)) {
+        set.status = 500
+        return {
+          success: false,
+          error: 'Invalid chunk path'
+        }
+      }
       await mkdir(file.storagePath, { recursive: true })
       await writeFile(chunkPath, Buffer.from(chunkArrayBuffer))
 
@@ -275,7 +397,9 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
 
   /**
    * POST /upload/complete
-   * Verify final file hash and complete upload
+   * Verify final file hash and complete upload.
+   * Assembles the final file by streaming chunks through SHA-256 —
+   * the whole file is never buffered in memory.
    */
   .post(
     '/complete',
@@ -292,12 +416,12 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         }
       }
 
-      // Validate finalHash
-      if (!finalHash || typeof finalHash !== 'string' || finalHash.trim() === '') {
+      // Validate finalHash format
+      if (!finalHash || !HEX256_RE.test(finalHash)) {
         set.status = 400
         return {
           success: false,
-          error: 'finalHash is required'
+          error: 'finalHash must be a hex-encoded SHA-256 hash'
         }
       }
 
@@ -322,52 +446,79 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         }
       }
 
-      // Read all chunks and verify final hash
-      const chunks: Buffer[] = []
-      for (let i = 0; i < file.totalChunks; i++) {
-        const chunkPath = join(file.storagePath, `chunk-${i}`)
-        try {
-          const chunkData = await readFile(chunkPath)
-          chunks.push(chunkData)
-        } catch {
-          set.status = 500
-          return {
-            success: false,
-            error: `Failed to read chunk ${i}`
-          }
-        }
-      }
-
-      // Combine chunks and verify hash
-      const combinedData = Buffer.concat(chunks)
-      const calculatedHash = await calculateSha256(combinedData.buffer)
-
-      if (calculatedHash !== finalHash) {
-        file.uploadStatus = 'failed'
-        await file.save()
-
-        set.status = 400
+      // Path containment for the assembled final file
+      if (!isStoragePathSafe(file.storagePath, file.fileName)) {
+        set.status = 500
         return {
           success: false,
-          error: `Final hash mismatch: expected ${finalHash}, got ${calculatedHash}`
+          error: 'Invalid storage path'
         }
       }
 
-      // Also verify against original file hash
-      if (calculatedHash !== file.sha256) {
-        file.uploadStatus = 'failed'
-        await file.save()
-
-        set.status = 400
-        return {
-          success: false,
-          error: `File hash mismatch with init hash: expected ${file.sha256}, got ${calculatedHash}`
-        }
-      }
-
-      // Write final file to storage
       const finalFilePath = join(file.storagePath, file.fileName)
-      await writeFile(finalFilePath, combinedData)
+
+      // Idempotency guard: reject re-completing an already assembled upload
+      if (existsSync(finalFilePath)) {
+        set.status = 400
+        return {
+          success: false,
+          error: 'Upload already completed'
+        }
+      }
+
+      // Stream every chunk through SHA-256 while assembling the final file
+      const hasher = createHash('sha256')
+      const output = createWriteStream(finalFilePath)
+      let currentChunkIndex = 0
+
+      try {
+        for (let i = 0; i < file.totalChunks; i++) {
+          currentChunkIndex = i
+          const chunkPath = join(file.storagePath, `chunk-${i}`)
+          if (!isWithinDir(file.storagePath, chunkPath)) {
+            throw new Error(`Invalid chunk path ${i}`)
+          }
+
+          const passThrough = new Transform({
+            transform(chunk, _encoding, callback) {
+              hasher.update(chunk)
+              callback(null, chunk)
+            }
+          })
+
+          await pipeline(createReadStream(chunkPath), passThrough, output, { end: false })
+        }
+
+        // Flush the writable and wait for it to fully drain
+        output.end()
+        await finished(output)
+      } catch (err) {
+        output.destroy()
+        console.error(`Failed to assemble final file ${fileId}:`, err)
+        await unlink(finalFilePath).catch(() => {})
+
+        set.status = 500
+        return {
+          success: false,
+          error: `Failed to read chunk ${currentChunkIndex}`
+        }
+      }
+
+      // Verify final hash against both the client-submitted hash and the init hash
+      const calculatedHash = hasher.digest('hex')
+
+      if (calculatedHash !== finalHash || calculatedHash !== file.sha256) {
+        await unlink(finalFilePath).catch(() => {})
+
+        file.uploadStatus = 'failed'
+        await file.save()
+
+        set.status = 400
+        return {
+          success: false,
+          error: 'Final hash verification failed'
+        }
+      }
 
       // Update file status to completed
       file.uploadStatus = 'completed'
@@ -433,7 +584,7 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
 
   /**
    * DELETE /upload/:fileId
-   * Cancel/delete an upload
+   * Cancel/delete an upload (database record + disk cleanup)
    */
   .delete(
     '/:fileId',
@@ -459,11 +610,17 @@ export const uploadRoutes = new Elysia({ prefix: '/upload' })
         }
       }
 
-      // Delete file from database
+      // Delete the record first
       await File.findByIdAndDelete(fileId)
 
-      // Note: Cleanup of physical files could be added here
-      // For now, we keep the files for recovery purposes
+      // Clean up stored chunks and artifacts from disk
+      try {
+        if (isStoragePathSafe(file.storagePath)) {
+          await rm(file.storagePath, { recursive: true, force: true })
+        }
+      } catch (err) {
+        console.error(`Failed to clean up cancelled upload ${fileId}:`, err)
+      }
 
       return {
         success: true,

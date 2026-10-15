@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { api } from '@/lib/api'
+import { authApi } from '@/lib/api'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -15,14 +15,14 @@ export default function RegisterPage() {
     setError('')
 
     try {
-      const { data, error: apiError } = await (api as any).api.auth.register.post({ email, password })
+      const { data, error: apiError } = await authApi.api.auth.register.post({ email, password })
       if (apiError || !data?.success) {
         setError(data?.error || apiError?.value?.error || 'Kayıt başarısız oldu.')
       } else {
         // Force full page reload to clear any cached states and re-run AuthGuard
         window.location.href = '/'
       }
-    } catch (err) {
+    } catch {
       setError('Kayıt olurken ağ hatası meydana geldi.')
     } finally {
       setLoading(false)
@@ -53,7 +53,7 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <form onSubmit={handleRegister} className="space-y-5">
+        <form onSubmit={(e) => { void handleRegister(e) }} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold tracking-wider text-gray-400 uppercase mb-2 ml-1">Yönetici E-Postası</label>
             <input 

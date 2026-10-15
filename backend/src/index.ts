@@ -5,13 +5,13 @@
  * @dataflow HTTP Request → Elysia routes → Handlers → Response
  */
 
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 import { edenTreaty } from '@elysiajs/eden'
 import { cors } from '@elysiajs/cors'
 import mongoose from 'mongoose'
 import { connectDatabase } from './config/database.js'
 import { File } from './models/File.js'
-import { uploadRoutes } from './routes/upload.js'
+import { uploadRoutes, isStoragePathSafe, MIME_TYPE_RE, SAFE_INLINE_MIME_RE } from './routes/upload.js'
 
 /**
  * Health check response type
@@ -27,26 +27,11 @@ interface HealthResponse {
 }
 
 /**
- * Error response schema (TypeBox)
- */
-const ErrorResponseSchema = t.Object({
-  error: t.String(),
-  code: t.Optional(t.String())
-})
-
-/**
  * Type guard for Error objects
  */
 function isError(obj: unknown): obj is Error {
   return obj instanceof Error
 }
-
-/**
- * Allowed CORS origins configuration
- */
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002']
 
 /**
  * Global error handler setup
@@ -69,24 +54,22 @@ const app = new Elysia()
       console.error(errorStack)
     }
 
-    // 2. Set appropriate status code
+    // 2. Set appropriate status code and return a generic message —
+    //    internal details (stacks, paths, driver errors) are logged but never leaked
     switch (code) {
       case 'NOT_FOUND':
         set.status = 404
-        break
+        return { error: 'Not found', code }
       case 'VALIDATION':
         set.status = 400
-        break
+        return { error: 'Invalid request', code }
+      case 'PARSE':
+        set.status = 400
+        return { error: 'Invalid request body', code }
       case 'INTERNAL_SERVER_ERROR':
       default:
         set.status = 500
-        break
-    }
-
-    // 3. Return formatted error response
-    return {
-      error: errorMessage,
-      code
+        return { error: 'Internal server error', code }
     }
   })
 
@@ -132,7 +115,9 @@ app.get('/health', (): HealthResponse => {
 /**
  * Favicon handler to prevent 404 errors
  */
-import { authRoutes, requireAuth } from './routes/auth.js'
+import { authRoutes, type SessionCookie } from './routes/auth.js'
+import { jwt } from '@elysiajs/jwt'
+import { ALLOWED_ORIGINS, JWT_SECRET } from './config/env.js'
 
 /**
  * Register Public Routes
@@ -140,15 +125,54 @@ import { authRoutes, requireAuth } from './routes/auth.js'
 app.use(authRoutes)
 
 /**
- * Register upload routes (public - requires auth token in request body, not cookie)
+ * Authentication Barrier 🛑
+ * Inline onBeforeHandle on the main instance: in Elysia, hooks added inside
+ * a `.use()`d plugin do NOT propagate to routes on the parent instance, so the
+ * guard must be registered here for every route added after this point
+ * (upload, files, stats, download, delete).
  */
-app.use(uploadRoutes)
+app.use(jwt({ name: 'jwt', secret: JWT_SECRET, exp: '7d' }))
 
 /**
- * Authentication Barrier 🛑
- * All routes registered below this block will require a valid JWT cookie
+ * Guard context contract (jwt cookie handle is provided by @elysiajs/jwt)
  */
-app.use(requireAuth)
+interface GuardContext {
+  request: Request
+  jwt: { verify: (token: string) => Promise<unknown> }
+  cookie: Record<string, SessionCookie | undefined>
+  set: { status: number }
+}
+
+app.onBeforeHandle(async (context) => {
+  const { request, jwt, cookie, set } = context as unknown as GuardContext
+
+  // CSRF defense: cookie-authenticated state-changing requests must originate
+  // from the allowlist (cross-site requests always carry an Origin header)
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    const origin = request.headers.get('origin')
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+      set.status = 403
+      return { success: false, error: 'Forbidden origin' }
+    }
+  }
+
+  const auth_token = cookie['auth_token']
+  if (!auth_token?.value) {
+    set.status = 401
+    return { success: false, error: 'Unauthorized route access' }
+  }
+
+  const payload = (await jwt.verify(auth_token.value)) as { id?: string } | null
+  if (!payload || !payload.id) {
+    set.status = 401
+    return { success: false, error: 'Invalid Session' }
+  }
+})
+
+/**
+ * Register upload routes (JWT cookie session via credentials: 'include')
+ */
+app.use(uploadRoutes)
 
 /**
  * List all files endpoint
@@ -173,8 +197,7 @@ app.get('/files', async () => {
       }))
     }
   } catch (err) {
-    const message = isError(err) ? err.message : String(err)
-    throw new Error(`Failed to fetch files: ${message}`)
+    throw new Error('Failed to fetch files', { cause: err })
   }
 })
 
@@ -189,8 +212,7 @@ app.get('/stats', async () => {
       data: stats
     }
   } catch (err) {
-    const message = isError(err) ? err.message : String(err)
-    throw new Error(`Failed to fetch stats: ${message}`)
+    throw new Error('Failed to fetch stats', { cause: err })
   }
 })
 
@@ -220,6 +242,12 @@ app.get('/files/:id/download', async ({ params, query, set }) => {
       return { success: false, error: 'File upload not completed' }
     }
 
+    // Path containment: the stored record must resolve inside STORAGE_DIR
+    if (!isStoragePathSafe(file.storagePath, file.fileName)) {
+      set.status = 500
+      return { success: false, error: 'Invalid storage path' }
+    }
+
     // Read file location
     const { join } = await import('node:path')
 
@@ -234,22 +262,32 @@ app.get('/files/:id/download', async ({ params, query, set }) => {
       return { success: false, error: 'File not found on disk' }
     }
 
-    // Set headers
-    set.headers['Content-Type'] = file.mimeType || 'application/octet-stream'
+    // Set headers — mimeType was validated at init, but re-check before
+    // using it so a tampered record can never inject a header value
+    const safeMimeType = MIME_TYPE_RE.test(file.mimeType)
+      ? file.mimeType
+      : 'application/octet-stream'
+    set.headers['Content-Type'] = safeMimeType
+
+    // Inline serving only for a safe allowlist; force attachment otherwise
+    const canInline = SAFE_INLINE_MIME_RE.test(safeMimeType)
+    const disposition = (query && query.inline === 'true' && canInline) ? 'inline' : 'attachment'
 
     // RFC 5987 compliant encoding for non-ASCII filenames (Turkish characters: ş, ı, ğ, ö, ç, ü)
     // This prevents "Header has invalid value" errors in Bun/Elysia
-    const asciiFallback = file.fileName.replace(/[^\x00-\x7F]/g, '_')
+    const asciiFallback = file.fileName.replace(/[^ -~]/g, '_')
     const encodedFileName = encodeURIComponent(file.fileName)
-    const disposition = (query && query.inline === 'true') ? 'inline' : 'attachment'
     set.headers['Content-Disposition'] = `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encodedFileName}`
-    
+
+    // Sandboxed context: block XSS via uploaded content on the API origin
+    set.headers['X-Content-Type-Options'] = 'nosniff'
+    set.headers['Content-Security-Policy'] = 'sandbox'
+
     set.headers['X-SHA256'] = file.sha256
 
     return bunFile
   } catch (err) {
-    const message = isError(err) ? err.message : String(err)
-    throw new Error(`Failed to download file: ${message}`)
+    throw new Error('Failed to download file', { cause: err })
   }
 })
 
@@ -284,8 +322,7 @@ app.delete('/files/:id', async ({ params, set }) => {
       message: 'File flagged as deleted successfully'
     }
   } catch (err) {
-    const message = isError(err) ? err.message : String(err)
-    throw new Error(`Failed to delete file: ${message}`)
+    throw new Error('Failed to delete file', { cause: err })
   }
 })
 
@@ -321,20 +358,22 @@ async function shutdown(signal: string) {
   }
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'))
-process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+process.on('SIGINT', () => { void shutdown('SIGINT') })
 
 /**
  * Start server
  */
-const PORT = process.env.PORT || 3001
+const PORT = Number(process.env.PORT) || 3001
+// Bind to loopback by default — never expose the API to the network unintentionally
+const HOST = process.env.HOST || '127.0.0.1'
 
 async function start() {
   try {
     // Connect to database before starting server
     await connectDatabase()
 
-    app.listen(PORT, () => {
+    app.listen({ hostname: HOST, port: PORT }, () => {
       console.log(`🦊 Cloud Storage API running at http://localhost:${PORT}`)
       console.log(`📊 Health check: http://localhost:${PORT}/health`)
       console.log(`📈 Stats: http://localhost:${PORT}/stats`)
@@ -346,7 +385,7 @@ async function start() {
   }
 }
 
-start()
+void start()
 
 /**
  * Export Eden Treaty for type-safe client

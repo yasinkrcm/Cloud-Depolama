@@ -284,7 +284,7 @@ export const useUploadStore = create<UploadStore>()(
               state: { ...parsed.state, queue: queueMap },
               version: parsed.version
             }
-          } catch (e) {
+          } catch {
             return null
           }
         },

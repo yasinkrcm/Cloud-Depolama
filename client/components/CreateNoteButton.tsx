@@ -91,7 +91,7 @@ export function CreateNoteButton() {
               </button>
               <button
                 type="button"
-                onClick={handleSave}
+                onClick={() => { void handleSave() }}
                 disabled={!title.trim() || !content.trim()}
                 className="px-5 py-2.5 bg-primary/20 text-blue-400 border border-primary/30 rounded-xl font-medium hover:bg-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-neon"
               >

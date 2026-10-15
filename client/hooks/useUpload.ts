@@ -71,6 +71,7 @@ async function uploadChunkWithRetry(
 
       const fetchOptions: RequestInit = {
         method: 'POST',
+        credentials: 'include',
         body: formData
       }
 
@@ -143,6 +144,7 @@ export function useUpload(): UseUploadReturn {
 
       const initResponse = await fetch(`${API_BASE_URL}/upload/init`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
@@ -237,6 +239,7 @@ export function useUpload(): UseUploadReturn {
 
       const completeResponse = await fetch(`${API_BASE_URL}/upload/complete`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileId,
@@ -290,7 +293,7 @@ export function useUpload(): UseUploadReturn {
 
     const upload = getUpload(id)
     if (upload?.fileId) {
-      await fetch(`${API_BASE_URL}/upload/${upload.fileId}`, { method: 'DELETE' })
+      await fetch(`${API_BASE_URL}/upload/${upload.fileId}`, { method: 'DELETE', credentials: 'include' })
     }
 
     updateUpload(id, { status: 'cancelled' })
@@ -343,7 +346,6 @@ export function useUpload(): UseUploadReturn {
     abortControllersRef.current.set(id, abortController)
 
     try {
-      const chunkSize = file.size / (upload.totalChunks || 1)
       const totalChunks = upload.totalChunks || Math.ceil(file.size / DEFAULT_CHUNK_SIZE)
 
       // Get current upload status from server
@@ -352,7 +354,7 @@ export function useUpload(): UseUploadReturn {
         throw new Error('No fileId found for resume')
       }
 
-      const statusResponse = await fetch(`${API_BASE_URL}/upload/${fileId}`)
+      const statusResponse = await fetch(`${API_BASE_URL}/upload/${fileId}`, { credentials: 'include' })
       if (!statusResponse.ok) {
         throw new Error('Failed to get upload status')
       }
@@ -422,6 +424,7 @@ export function useUpload(): UseUploadReturn {
 
       const completeResponse = await fetch(`${API_BASE_URL}/upload/complete`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileId,
@@ -499,7 +502,7 @@ export function useUploadStats() {
   return useQuery({
     queryKey: ['upload-stats'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/stats`)
+      const response = await fetch(`${API_BASE_URL}/stats`, { credentials: 'include' })
       if (!response.ok) {
         throw new Error('Failed to fetch stats')
       }
